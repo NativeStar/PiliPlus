@@ -26,7 +26,7 @@ class FavPgcChildPage extends StatefulWidget {
 }
 
 class _FavPgcChildPageState extends State<FavPgcChildPage>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, GridMixin {
   late final FavPgcController _favPgcController = Get.put(
     FavPgcController(widget.type, widget.followStatus),
     tag: '${widget.type}${widget.followStatus}',
@@ -36,7 +36,7 @@ class _FavPgcChildPageState extends State<FavPgcChildPage>
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
-    final padding = MediaQuery.paddingOf(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     final bottomH = 50 + padding.bottom;
     return Stack(
       clipBehavior: Clip.none,
@@ -48,7 +48,7 @@ class _FavPgcChildPageState extends State<FavPgcChildPage>
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverPadding(
-                padding: EdgeInsets.only(bottom: padding.bottom + 80),
+                padding: EdgeInsets.only(bottom: padding.bottom + 100),
                 sliver: Obx(
                   () => _buildBody(_favPgcController.loadingState.value),
                 ),
@@ -78,7 +78,6 @@ class _FavPgcChildPageState extends State<FavPgcChildPage>
                     ),
                   ),
                 ),
-                width: double.infinity,
                 child: Row(
                   children: [
                     const SizedBox(width: 16),
@@ -96,6 +95,7 @@ class _FavPgcChildPageState extends State<FavPgcChildPage>
                         onChanged: (value) {
                           _favPgcController.handleSelect(
                             checked: !_favPgcController.allSelected.value,
+                            disableSelect: false,
                           );
                         },
                       ),
@@ -164,52 +164,46 @@ class _FavPgcChildPageState extends State<FavPgcChildPage>
 
   Widget _buildBody(LoadingState<List<FavPgcItemModel>?> loadingState) {
     return switch (loadingState) {
-      Loading() => SliverGrid(
-        gridDelegate: Grid.videoCardHDelegate(context),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            return const FavPgcItemSkeleton();
-          },
-          childCount: 10,
-        ),
+      Loading() => SliverGrid.builder(
+        gridDelegate: gridDelegate,
+        itemBuilder: (context, index) => const FavPgcItemSkeleton(),
+        itemCount: 10,
       ),
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: Grid.videoCardHDelegate(context),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == response.length - 1) {
-                      _favPgcController.onLoadMore();
-                    }
-                    final item = response[index];
-                    return FavPgcItem(
-                      item: item,
-                      ctr: _favPgcController,
-                      onSelect: () => _favPgcController.onSelect(item),
-                      onUpdateStatus: () => showPgcFollowDialog(
-                        context: context,
-                        type: widget.type == 0 ? '追番' : '追剧',
-                        followStatus: widget.followStatus,
-                        onUpdateStatus: (followStatus) {
-                          if (followStatus == -1) {
-                            _favPgcController.pgcDel(
-                              index,
-                              item.seasonId,
-                            );
-                          } else {
-                            _favPgcController.onUpdate(
-                              index,
-                              followStatus,
-                              item.seasonId,
-                            );
-                          }
-                        },
-                      ),
-                    );
-                  },
-                  childCount: response!.length,
-                ),
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    _favPgcController.onLoadMore();
+                  }
+                  final item = response[index];
+                  return FavPgcItem(
+                    item: item,
+                    ctr: _favPgcController,
+                    onSelect: () => _favPgcController.onSelect(item),
+                    onUpdateStatus: () => showPgcFollowDialog(
+                      context: context,
+                      type: widget.type == 0 ? '追番' : '追剧',
+                      followStatus: widget.followStatus,
+                      onUpdateStatus: (followStatus) {
+                        if (followStatus == -1) {
+                          _favPgcController.pgcDel(
+                            index,
+                            item.seasonId,
+                          );
+                        } else {
+                          _favPgcController.onUpdate(
+                            index,
+                            followStatus,
+                            item.seasonId,
+                          );
+                        }
+                      },
+                    ),
+                  );
+                },
+                itemCount: response!.length,
               )
             : HttpError(onReload: _favPgcController.onReload),
       Error(:var errMsg) => HttpError(

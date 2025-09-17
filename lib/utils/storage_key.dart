@@ -1,6 +1,6 @@
 // ignore_for_file: constant_identifier_names
 
-class SettingBoxKey {
+abstract class SettingBoxKey {
   static const String btmProgressBehavior = 'btmProgressBehavior',
       defaultVideoSpeed = 'defaultVideoSpeed',
       autoUpgradeEnable = 'autoUpgradeEnable',
@@ -23,7 +23,8 @@ class SettingBoxKey {
       enableAutoBrightness = 'enableAutoBrightness',
       enableAutoEnter = 'enableAutoEnter',
       enableAutoExit = 'enableAutoExit',
-      enableOnlineTotal = 'enableOnlineTotal';
+      enableOnlineTotal = 'enableOnlineTotal',
+      showSuperChat = 'showSuperChat';
 
   static const String enableVerticalExpand = 'enableVerticalExpand',
       feedBackEnable = 'feedBackEnable',
@@ -40,7 +41,6 @@ class SettingBoxKey {
       fullScreenGestureReverse = 'fullScreenGestureReverse',
       enableBackgroundPlay = 'enableBackgroundPlay',
       continuePlayInBackground = 'continuePlayInBackground',
-      enableRcmdDynamic = 'enableRcmdDynamic',
       appRcmd = 'appRcmd',
       enableSaveLastData = 'enableSaveLastData',
       minDurationForRcmd = 'minDurationForRcmd',
@@ -131,7 +131,16 @@ class SettingBoxKey {
       memberTab = 'memberTab',
       dynamicDetailRatio = 'dynamicDetailRatio',
       directExitOnBack = 'directExitOnBack',
-      quickFavId = 'quickFavId';
+      quickFavId = 'quickFavId',
+      showFsScreenshotBtn = 'showFsScreenshotBtn',
+      showFsLockBtn = 'showFsLockBtn',
+      silentDownImg = 'silentDownImg',
+      showMemberShop = 'showMemberShop';
+
+  static const String minimizeOnExit = 'minimizeOnExit',
+      windowSize = 'windowSize',
+      windowPosition = 'windowPosition',
+      isWindowMaximized = 'isWindowMaximized';
 
   static const String subtitlePreferenceV2 = 'subtitlePreferenceV2',
       enableDragSubtitle = 'enableDragSubtitle',
@@ -185,7 +194,6 @@ class SettingBoxKey {
       enableSingleRow = 'enableSingleRow',
       displayMode = 'displayMode',
       smallCardWidth = 'smallCardWidth',
-      videoPlayerRemoveSafeArea = 'videoPlayerRemoveSafeArea',
       dynamicsWaterfallFlow = 'dynamicsWaterfallFlow',
       upPanelPosition = 'upPanelPosition',
       dynamicsShowAllFollowedUp = 'dynamicsShowAllFollowedUp',
@@ -206,16 +214,17 @@ class SettingBoxKey {
       reduceLuxColor = 'reduceLuxColor';
 }
 
-class LocalCacheKey {
+abstract class LocalCacheKey {
   static const String historyPause = 'historyPause',
       blackMids = 'blackMids',
       danmakuFilterRules = 'danmakuFilterRules',
       mixinKey = 'mixinKey',
       timeStamp = 'timeStamp',
       starUsers = 'starUsers';
+      buvid = 'buvid';
 }
 
-class VideoBoxKey {
+abstract class VideoBoxKey {
   static const String videoFit = 'videoFit',
       videoBrightness = 'videoBrightness',
       videoSpeed = 'videoSpeed',

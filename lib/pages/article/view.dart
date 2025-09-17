@@ -20,25 +20,21 @@ import 'package:PiliPlus/pages/article/widgets/opus_content.dart';
 import 'package:PiliPlus/pages/common/dyn/common_dyn_page.dart';
 import 'package:PiliPlus/pages/dynamics_repost/view.dart';
 import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
-import 'package:PiliPlus/utils/context_ext.dart';
-import 'package:PiliPlus/utils/date_util.dart';
-import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/grid.dart';
-import 'package:PiliPlus/utils/image_util.dart';
-import 'package:PiliPlus/utils/num_util.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
-import 'package:PiliPlus/utils/storage.dart';
-import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
 import 'package:html/parser.dart' as parser;
 
-class ArticlePage extends CommonDynPage {
+class ArticlePage extends StatefulWidget {
   const ArticlePage({super.key});
 
   @override
@@ -47,9 +43,9 @@ class ArticlePage extends CommonDynPage {
 
 class _ArticlePageState extends CommonDynPageState<ArticlePage> {
   @override
-  final ArticleController controller = Get.put(
-    ArticleController(),
-    tag: Utils.generateRandomString(8),
+  final ArticleController controller = Get.putOrFind(
+    ArticleController.new,
+    tag: Get.parameters['type']! + Get.parameters['id']!,
   );
 
   @override
@@ -61,9 +57,9 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.scrollController.hasClients) {
+      if (scrollController.hasClients) {
         controller.showTitle.value =
-            controller.scrollController.positions.last.pixels >= 45;
+            scrollController.positions.last.pixels >= 45;
       }
     });
   }
@@ -71,17 +67,15 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isPortrait = context.isPortrait;
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: _buildAppBar(isPortrait),
-      body: SafeArea(
-        top: false,
-        bottom: false,
+      appBar: _buildAppBar(),
+      body: Padding(
+        padding: EdgeInsets.only(left: padding.left, right: padding.right),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            _buildPage(theme, isPortrait),
+            _buildPage(theme),
             _buildBottom(theme),
           ],
         ),
@@ -89,100 +83,88 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
     );
   }
 
-  Widget _buildPage(ThemeData theme, bool isPortrait) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        double padding = max(
-          context.width / 2 - Grid.smallCardWidth,
-          0,
-        );
-
-        if (isPortrait) {
-          final maxWidth = constraints.maxWidth - 2 * padding - 24;
-          return Padding(
-            padding: EdgeInsets.symmetric(horizontal: padding),
-            child: CustomScrollView(
-              controller: controller.scrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                _buildContent(theme, maxWidth),
-                SliverToBoxAdapter(
-                  child: Divider(
-                    thickness: 8,
-                    color: theme.dividerColor.withValues(
-                      alpha: 0.05,
-                    ),
-                  ),
-                ),
-                buildReplyHeader(theme),
-                Obx(
-                  () => _buildReplyList(
-                    theme,
-                    controller.loadingState.value,
-                  ),
-                ),
-              ],
+  Widget _buildPage(ThemeData theme) {
+    double padding = max(maxWidth / 2 - Grid.smallCardWidth, 0);
+    if (isPortrait) {
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: padding),
+        child: CustomScrollView(
+          controller: scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            _buildContent(
+              theme,
+              maxWidth - this.padding.horizontal - 2 * padding - 24,
             ),
-          );
-        }
-
-        padding = padding / 4;
-        final flex = controller.ratio[0].toInt();
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: flex,
-              child: CustomScrollView(
-                controller: controller.scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverPadding(
-                    padding: EdgeInsets.only(
-                      left: padding,
-                      bottom: MediaQuery.paddingOf(context).bottom + 80,
-                    ),
-                    sliver: _buildContent(
-                      theme,
-                      constraints.maxWidth * flex - padding - 24,
-                    ),
-                  ),
-                ],
+            SliverToBoxAdapter(
+              child: Divider(
+                thickness: 8,
+                color: theme.dividerColor.withValues(alpha: 0.05),
               ),
             ),
-            VerticalDivider(
-              thickness: 8,
-              color: theme.dividerColor.withValues(alpha: 0.05),
-            ),
-            Expanded(
-              flex: controller.ratio[1].toInt(),
-              child: Scaffold(
-                key: scaffoldKey,
-                backgroundColor: Colors.transparent,
-                body: refreshIndicator(
-                  onRefresh: controller.onRefresh,
-                  child: Padding(
-                    padding: EdgeInsets.only(right: padding),
-                    child: CustomScrollView(
-                      controller: controller.scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      slivers: [
-                        buildReplyHeader(theme),
-                        Obx(
-                          () => _buildReplyList(
-                            theme,
-                            controller.loadingState.value,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            buildReplyHeader(theme),
+            Obx(() => _buildReplyList(theme, controller.loadingState.value)),
           ],
-        );
-      },
+        ),
+      );
+    }
+
+    padding = padding / 4;
+    final flex = controller.ratio[0].toInt();
+    final flex1 = controller.ratio[1].toInt();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: flex,
+          child: CustomScrollView(
+            controller: scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverPadding(
+                padding: EdgeInsets.only(
+                  left: padding,
+                  bottom: this.padding.bottom + 100,
+                ),
+                sliver: _buildContent(
+                  theme,
+                  (maxWidth - this.padding.horizontal) * flex / (flex + flex1) -
+                      padding -
+                      32,
+                ),
+              ),
+            ],
+          ),
+        ),
+        VerticalDivider(
+          thickness: 8,
+          color: theme.dividerColor.withValues(alpha: 0.05),
+        ),
+        Expanded(
+          flex: flex1,
+          child: Padding(
+            padding: EdgeInsets.only(right: padding),
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              resizeToAvoidBottomInset: false,
+              body: refreshIndicator(
+                onRefresh: controller.onRefresh,
+                child: CustomScrollView(
+                  controller: scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    buildReplyHeader(theme),
+                    Obx(
+                      () =>
+                          _buildReplyList(theme, controller.loadingState.value),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -193,14 +175,13 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
         if (controller.isLoaded.value) {
           late Widget content;
           if (controller.opus != null) {
-            if (kDebugMode) debugPrint('json page');
+            // if (kDebugMode) debugPrint('json page');
             content = OpusContent(
               opus: controller.opus!,
-              callback: imageCallback,
               maxWidth: maxWidth,
             );
           } else if (controller.opusData?.modules.moduleBlocked != null) {
-            if (kDebugMode) debugPrint('moduleBlocked');
+            // if (kDebugMode) debugPrint('moduleBlocked');
             final moduleBlocked = controller.opusData!.modules.moduleBlocked!;
             content = SliverToBoxAdapter(
               child: moduleBlockedItem(theme, moduleBlocked, maxWidth),
@@ -210,7 +191,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
               // json
               return ArticleOpus(ops: controller.articleData?.ops);
             }
-            if (kDebugMode) debugPrint('html page');
+            // if (kDebugMode) debugPrint('html page');
             final res = parser.parse(controller.articleData!.content!);
             if (res.body!.children.isEmpty) {
               content = SliverToBoxAdapter(
@@ -218,7 +199,6 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
                   context: context,
                   html: controller.articleData!.content!,
                   maxWidth: maxWidth,
-                  callback: imageCallback,
                 ),
               );
             } else {
@@ -229,7 +209,6 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
                     context: context,
                     element: res.body!.children[index],
                     maxWidth: maxWidth,
-                    callback: imageCallback,
                   );
                 },
                 separatorBuilder: (context, index) =>
@@ -312,7 +291,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
                                             fit: pic.isLongPic == true
                                                 ? BoxFit.cover
                                                 : null,
-                                            imageUrl: ImageUtil.thumbnailUrl(
+                                            imageUrl: ImageUtils.thumbnailUrl(
                                               pic.url,
                                               60,
                                             ),
@@ -388,7 +367,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
                             ),
                             if (pubTime != null)
                               Text(
-                                DateUtil.format(pubTime),
+                                DateFormatUtils.format(pubTime),
                                 style: TextStyle(
                                   color: theme.colorScheme.outline,
                                   fontSize:
@@ -427,9 +406,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
     return switch (loadingState) {
       Loading() => SliverList.builder(
         itemCount: 12,
-        itemBuilder: (context, index) {
-          return const VideoReplySkeleton();
-        },
+        itemBuilder: (context, index) => const VideoReplySkeleton(),
       ),
       Success(:var response) =>
         response?.isNotEmpty == true
@@ -440,9 +417,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
                     controller.onLoadMore();
                     return Container(
                       alignment: Alignment.center,
-                      margin: EdgeInsets.only(
-                        bottom: MediaQuery.paddingOf(context).bottom,
-                      ),
+                      margin: EdgeInsets.only(bottom: padding.bottom),
                       height: 125,
                       child: Text(
                         controller.isEnd ? '没有更多了' : '加载中...',
@@ -457,7 +432,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
                       replyItem: response[index],
                       replyLevel: 1,
                       replyReply: (replyItem, id) =>
-                          replyReply(context, replyItem, id),
+                          replyReply(context, replyItem, id, theme),
                       onReply: (replyItem) => controller.onReply(
                         context,
                         replyItem: replyItem,
@@ -465,7 +440,6 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
                       onDelete: (item, subIndex) =>
                           controller.onRemove(index, item, subIndex),
                       upMid: controller.upMid,
-                      callback: imageCallback,
                       onCheckReply: (item) =>
                           controller.onCheckReply(item, isManual: true),
                       onToggleTop: (item) => controller.onToggleTop(
@@ -481,12 +455,12 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
             : HttpError(onReload: controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
-        onReload: controller.onReload,
+        onReload: controller.isLoaded.value ? controller.onReload : null,
       ),
     };
   }
 
-  PreferredSizeWidget _buildAppBar(bool isPortrait) => AppBar(
+  PreferredSizeWidget _buildAppBar() => AppBar(
     title: Obx(() {
       if (controller.isLoaded.value && controller.showTitle.value) {
         return Text(controller.summary.title ?? '');
@@ -495,49 +469,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
     }),
     actions: [
       const SizedBox(width: 4),
-      if (!isPortrait)
-        IconButton(
-          tooltip: '页面比例调节',
-          onPressed: () => showDialog(
-            context: context,
-            builder: (context) => Align(
-              alignment: Alignment.topRight,
-              child: Container(
-                margin: const EdgeInsets.only(
-                  top: 56,
-                  right: 16,
-                ),
-                width: context.width / 4,
-                height: 32,
-                child: Builder(
-                  builder: (context) => Slider(
-                    min: 1,
-                    max: 100,
-                    value: controller.ratio.first,
-                    onChanged: (value) {
-                      if (value >= 10 && value <= 90) {
-                        value = value.toPrecision(2);
-                        controller.ratio
-                          ..[0] = value
-                          ..[1] = 100 - value;
-                        GStorage.setting.put(
-                          SettingBoxKey.dynamicDetailRatio,
-                          controller.ratio,
-                        );
-                        (context as Element).markNeedsBuild();
-                        setState(() {});
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-          icon: Transform.rotate(
-            angle: pi / 2,
-            child: const Icon(Icons.splitscreen, size: 19),
-          ),
-        ),
+      if (!isPortrait) ratioWidget(maxWidth),
       IconButton(
         tooltip: '浏览器打开',
         onPressed: () => PageUtils.inAppWebview(controller.url),
@@ -618,30 +550,18 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
     bottom: 0,
     right: 0,
     child: SlideTransition(
-      position: controller.fabAnim,
+      position: fabAnim,
       child: Builder(
         builder: (context) {
-          Widget button() => FloatingActionButton(
-            heroTag: null,
-            onPressed: () {
-              feedBack();
-              controller.onReply(
-                context,
-                oid: controller.commentId,
-                replyType: controller.commentType,
-              );
-            },
-            tooltip: '评论动态',
-            child: const Icon(Icons.reply),
-          );
-
-          final bottom = MediaQuery.paddingOf(context).bottom;
           if (!controller.showDynActionBar) {
             return Align(
               alignment: Alignment.bottomRight,
               child: Padding(
-                padding: EdgeInsets.only(right: 14, bottom: bottom + 14),
-                child: button(),
+                padding: EdgeInsets.only(
+                  right: 14,
+                  bottom: padding.bottom + 14,
+                ),
+                child: replyButton,
               ),
             );
           }
@@ -671,7 +591,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
               ),
               style: btnStyle,
               label: Text(
-                stat?.count != null ? NumUtil.numFormat(stat!.count) : text,
+                stat?.count != null ? NumUtils.numFormat(stat!.count) : text,
                 style: TextStyle(color: color),
               ),
             );
@@ -683,9 +603,9 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
             Widget btn = Padding(
               padding: EdgeInsets.only(
                 right: 14,
-                bottom: 14 + (stats != null ? 0 : bottom),
+                bottom: 14 + (stats != null ? 0 : padding.bottom),
               ),
-              child: button(),
+              child: replyButton,
             );
 
             if (stats == null) {
@@ -711,7 +631,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
                       ),
                     ),
                   ),
-                  padding: EdgeInsets.only(bottom: bottom),
+                  padding: EdgeInsets.only(bottom: padding.bottom),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [

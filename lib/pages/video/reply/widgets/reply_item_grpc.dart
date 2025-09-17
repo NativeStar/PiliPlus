@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/dialog/report.dart';
-import 'package:PiliPlus/common/widgets/image/image_view.dart';
+import 'package:PiliPlus/common/widgets/image/custom_grid_view.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/pendant_avatar.dart';
 import 'package:PiliPlus/common/widgets/text/text.dart' as custom_text;
@@ -19,11 +19,11 @@ import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/reply/widgets/zan_grpc.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/context_ext.dart';
-import 'package:PiliPlus/utils/date_util.dart';
-import 'package:PiliPlus/utils/duration_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
+import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
-import 'package:PiliPlus/utils/image_util.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/url_utils.dart';
@@ -51,9 +51,9 @@ class ReplyItemGrpc extends StatelessWidget {
     this.getTag,
     this.onViewImage,
     this.onDismissed,
-    this.callback,
     this.onCheckReply,
     this.onToggleTop,
+    this.jumpToDialogue,
   });
   final ReplyInfo replyItem;
   final int replyLevel;
@@ -66,9 +66,9 @@ class ReplyItemGrpc extends StatelessWidget {
   final Function? getTag;
   final VoidCallback? onViewImage;
   final ValueChanged<int>? onDismissed;
-  final Function(List<String>, int)? callback;
   final ValueChanged<ReplyInfo>? onCheckReply;
   final ValueChanged<ReplyInfo>? onToggleTop;
+  final VoidCallback? jumpToDialogue;
 
   static final _voteRegExp = RegExp(r"^\{vote:\d+?\}$");
   static final _timeRegExp = RegExp(r'^\b(?:\d+[:：])?\d+[:：]\d+\b$');
@@ -116,6 +116,7 @@ class ReplyItemGrpc extends StatelessWidget {
 
   Widget _buildContent(BuildContext context, ThemeData theme) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (PendantAvatar.showDynDecorate &&
             replyItem.member.hasGarbCardImage())
@@ -152,10 +153,7 @@ class ReplyItemGrpc extends StatelessWidget {
                   ],
                 ),
               ),
-              SizedBox(
-                width: double.infinity,
-                child: _buildAuthorPanel(context, theme),
-              ),
+              _buildAuthorPanel(context, theme),
             ],
           )
         else
@@ -240,11 +238,13 @@ class ReplyItemGrpc extends StatelessWidget {
                     children: <Widget>[
                       Text(
                         replyLevel == 0
-                            ? DateUtil.format(
+                            ? DateFormatUtils.format(
                                 replyItem.ctime.toInt(),
-                                format: DateUtil.longFormatDs,
+                                format: DateFormatUtils.longFormatDs,
                               )
-                            : DateUtil.dateFormat(replyItem.ctime.toInt()),
+                            : DateFormatUtils.dateFormat(
+                                replyItem.ctime.toInt(),
+                              ),
                         style: TextStyle(
                           fontSize: theme.textTheme.labelSmall!.fontSize,
                           color: theme.colorScheme.outline,
@@ -278,7 +278,7 @@ class ReplyItemGrpc extends StatelessWidget {
               children: [
                 if (replyItem.replyControl.isUpTop) ...[
                   const WidgetSpan(
-                    alignment: PlaceholderAlignment.top,
+                    alignment: PlaceholderAlignment.middle,
                     child: PBadge(
                       text: 'TOP',
                       size: PBadgeSize.small,
@@ -299,9 +299,9 @@ class ReplyItemGrpc extends StatelessWidget {
           Padding(
             padding: padding,
             child: LayoutBuilder(
-              builder: (context, constraints) => imageView(
-                constraints.maxWidth,
-                replyItem.content.pictures
+              builder: (context, constraints) => CustomGridView(
+                maxWidth: constraints.maxWidth,
+                picArr: replyItem.content.pictures
                     .map(
                       (item) => ImageModel(
                         width: item.imgWidth,
@@ -312,7 +312,6 @@ class ReplyItemGrpc extends StatelessWidget {
                     .toList(),
                 onViewImage: onViewImage,
                 onDismissed: onDismissed,
-                callback: callback,
               ),
             ),
           ),
@@ -416,6 +415,24 @@ class ReplyItemGrpc extends StatelessWidget {
                 ),
               ),
             ),
+          )
+        else if (replyLevel == 3 &&
+            needDivider &&
+            replyItem.parent != replyItem.root)
+          SizedBox(
+            height: 32,
+            child: TextButton(
+              onPressed: jumpToDialogue,
+              style: style,
+              child: Text(
+                '跳转回复',
+                style: TextStyle(
+                  color: theme.colorScheme.outline,
+                  fontSize: theme.textTheme.labelMedium!.fontSize,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ),
           ),
         const Spacer(),
         ZanButtonGrpc(replyItem: replyItem),
@@ -439,7 +456,7 @@ class ReplyItemGrpc extends StatelessWidget {
         clipBehavior: Clip.hardEdge,
         animationDuration: Duration.zero,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (replies.isNotEmpty)
               ...List.generate(replies.length, (index) {
@@ -478,8 +495,7 @@ class ReplyItemGrpc extends StatelessWidget {
                       },
                     );
                   },
-                  child: Container(
-                    width: double.infinity,
+                  child: Padding(
                     padding: padding,
                     child: Text.rich(
                       style: TextStyle(
@@ -537,8 +553,7 @@ class ReplyItemGrpc extends StatelessWidget {
             if (extraRow)
               InkWell(
                 onTap: () => replyReply?.call(replyItem, null),
-                child: Container(
-                  width: double.infinity,
+                child: Padding(
                   padding: length == 1
                       ? const EdgeInsets.fromLTRB(8, 6, 8, 6)
                       : const EdgeInsets.fromLTRB(8, 5, 8, 8),
@@ -581,20 +596,7 @@ class ReplyItemGrpc extends StatelessWidget {
   ) {
     final Content content = replyItem.content;
     final List<InlineSpan> spanChildren = <InlineSpan>[];
-
-    if (content.richText.hasNote()) {
-      spanChildren.add(
-        TextSpan(
-          text: '[笔记] ',
-          style: TextStyle(
-            color: theme.colorScheme.primary,
-          ),
-          recognizer: TapGestureRecognizer()
-            ..onTap = () =>
-                PageUtils.handleWebview(content.richText.note.clickUrl),
-        ),
-      );
-    }
+    bool hasNote = false;
 
     final urlKeys = content.urls.keys;
     // 构建正则表达式
@@ -626,11 +628,14 @@ class ReplyItemGrpc extends StatelessWidget {
         return;
       }
       final isCv = url.clickReport.startsWith('{"cvid');
+      if (isCv) {
+        hasNote = true;
+      }
       final children = [
         if (!isCv && url.hasPrefixIcon())
           WidgetSpan(
             child: CachedNetworkImage(
-              imageUrl: ImageUtil.thumbnailUrl(url.prefixIcon),
+              imageUrl: ImageUtils.thumbnailUrl(url.prefixIcon),
               height: 19,
               color: theme.colorScheme.primary,
               placeholder: (context, url) {
@@ -740,17 +745,9 @@ class ReplyItemGrpc extends StatelessWidget {
             final ctr = Get.find<VideoDetailController>(
               tag: getTag?.call() ?? Get.arguments['heroTag'],
             );
-            int duration = ctr.data.timeLength!;
-            List<int> split = matchStr
-                .split(':')
-                .reversed
-                .map((item) => int.parse(item))
-                .toList();
-            int seek = 0;
-            for (int i = 0; i < split.length; i++) {
-              seek += split[i] * pow(60, i).toInt();
-            }
-            isValid = seek * 1000 <= duration;
+            isValid =
+                DurationUtils.parseDuration(matchStr) * 1000 <=
+                ctr.data.timeLength!;
           } catch (e) {
             if (kDebugMode) debugPrint('failed to validate: $e');
           }
@@ -770,7 +767,7 @@ class ReplyItemGrpc extends StatelessWidget {
                             tag: Get.arguments['heroTag'],
                           ).plPlayerController.seekTo(
                             Duration(
-                              seconds: DurationUtil.parseDuration(matchStr),
+                              seconds: DurationUtils.parseDuration(matchStr),
                             ),
                             isSeek: false,
                           );
@@ -833,6 +830,28 @@ class ReplyItemGrpc extends StatelessWidget {
       }
     }
 
+    if (!hasNote &&
+        (content.richText.hasNote() ||
+            replyItem.replyControl.bizScene == 'note')) {
+      final hasClickUrl = content.richText.note.hasClickUrl();
+      spanChildren.insert(
+        0,
+        TextSpan(
+          text: '[笔记] ',
+          style: TextStyle(
+            color: hasClickUrl
+                ? theme.colorScheme.primary
+                : theme.colorScheme.secondary,
+          ),
+          recognizer: hasClickUrl
+              ? (TapGestureRecognizer()
+                  ..onTap = () =>
+                      PageUtils.handleWebview(content.richText.note.clickUrl))
+              : null,
+        ),
+      );
+    }
+
     return TextSpan(children: spanChildren);
   }
 
@@ -850,7 +869,7 @@ class ReplyItemGrpc extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.paddingOf(context).bottom + 20,
+        bottom: MediaQuery.viewPaddingOf(context).bottom + 20,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

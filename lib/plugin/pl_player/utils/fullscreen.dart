@@ -13,9 +13,9 @@ Future<void> landScape() async {
   try {
     if (kIsWeb) {
       await document.documentElement?.requestFullscreen();
-    } else if (Platform.isAndroid || Platform.isIOS) {
+    } else if (Utils.isMobile) {
       await AutoOrientation.landscapeAutoMode(forceSensor: true);
-    } else if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    } else if (Utils.isDesktop) {
       await const MethodChannel(
         'com.alexmercerind/media_kit_video',
       ).invokeMethod(
@@ -64,19 +64,29 @@ Future<void> fullAutoModeForceSensor() async {
 }
 
 Future<void> hideStatusBar() async {
+  if (!_showStatusBar) {
+    return;
+  }
+  _showStatusBar = false;
   await SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.immersiveSticky,
   );
 }
 
+bool _showStatusBar = true;
+
 //退出全屏显示
 Future<void> showStatusBar() async {
+  if (_showStatusBar) {
+    return;
+  }
+  _showStatusBar = true;
   dynamic document;
   late SystemUiMode mode = SystemUiMode.edgeToEdge;
   try {
     if (kIsWeb) {
       document.exitFullscreen();
-    } else if (Platform.isAndroid || Platform.isIOS) {
+    } else if (Utils.isMobile) {
       if (Platform.isAndroid && (await Utils.sdkInt < 29)) {
         mode = SystemUiMode.manual;
       }
@@ -84,7 +94,7 @@ Future<void> showStatusBar() async {
         mode,
         overlays: SystemUiOverlay.values,
       );
-    } else if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    } else if (Utils.isDesktop) {
       await const MethodChannel(
         'com.alexmercerind/media_kit_video',
       ).invokeMethod(

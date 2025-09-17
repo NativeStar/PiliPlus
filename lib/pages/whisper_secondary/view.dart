@@ -32,6 +32,7 @@ class _WhisperSecPageState extends State<WhisperSecPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(widget.name),
         actions: [
@@ -46,6 +47,7 @@ class _WhisperSecPageState extends State<WhisperSecPage> {
                           onTap: () => e.type.action(
                             context: context,
                             controller: _controller,
+                            item: e,
                           ),
                           child: Row(
                             children: [
@@ -70,7 +72,7 @@ class _WhisperSecPageState extends State<WhisperSecPage> {
           slivers: [
             SliverPadding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.paddingOf(context).bottom + 80,
+                bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
               ),
               sliver: Obx(() => _buildBody(_controller.loadingState.value)),
             ),
@@ -90,9 +92,7 @@ class _WhisperSecPageState extends State<WhisperSecPage> {
     return switch (loadingState) {
       Loading() => SliverList.builder(
         itemCount: 12,
-        itemBuilder: (context, index) {
-          return const WhisperItemSkeleton();
-        },
+        itemBuilder: (context, index) => const WhisperItemSkeleton(),
       ),
       Success(:var response) =>
         response?.isNotEmpty == true
@@ -115,9 +115,7 @@ class _WhisperSecPageState extends State<WhisperSecPage> {
                 },
                 separatorBuilder: (context, index) => divider,
               )
-            : HttpError(
-                onReload: _controller.onReload,
-              ),
+            : HttpError(onReload: _controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: _controller.onReload,

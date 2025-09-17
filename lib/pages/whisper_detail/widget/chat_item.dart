@@ -11,10 +11,10 @@ import 'package:PiliPlus/models/common/badge_type.dart';
 import 'package:PiliPlus/models/common/image_preview_type.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
-import 'package:PiliPlus/utils/date_util.dart';
-import 'package:PiliPlus/utils/duration_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
+import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
-import 'package:PiliPlus/utils/image_util.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
@@ -70,7 +70,7 @@ class ChatItem extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 6, bottom: 18),
                 child: Text(
-                  DateUtil.chatFormat(item.timestamp.toInt()),
+                  DateFormatUtils.chatFormat(item.timestamp.toInt()),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: theme.colorScheme.outline),
                 ),
@@ -100,12 +100,19 @@ class ChatItem extends StatelessWidget {
                               color: isOwner
                                   ? theme.colorScheme.secondaryContainer
                                   : theme.colorScheme.onInverseSurface,
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(16),
-                                topRight: const Radius.circular(16),
-                                bottomLeft: Radius.circular(isOwner ? 16 : 6),
-                                bottomRight: Radius.circular(isOwner ? 6 : 16),
-                              ),
+                              borderRadius: isOwner
+                                  ? const BorderRadius.only(
+                                      topLeft: Radius.circular(16),
+                                      topRight: Radius.circular(16),
+                                      bottomLeft: Radius.circular(16),
+                                      bottomRight: Radius.circular(6),
+                                    )
+                                  : const BorderRadius.only(
+                                      topLeft: Radius.circular(16),
+                                      topRight: Radius.circular(16),
+                                      bottomLeft: Radius.circular(6),
+                                      bottomRight: Radius.circular(16),
+                                    ),
                             ),
                             padding: EdgeInsets.only(
                               top: 8,
@@ -444,7 +451,7 @@ class ChatItem extends StatelessWidget {
                         type: PBadgeType.gray,
                         text: content['times'] == 0
                             ? '--:--'
-                            : DurationUtil.formatDuration(content['times']),
+                            : DurationUtils.formatDuration(content['times']),
                       ),
                     ],
                   ),
@@ -688,7 +695,7 @@ class ChatItem extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SelectableText(
               content['title'],
@@ -728,10 +735,7 @@ class ChatItem extends StatelessWidget {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => PiliScheme.routePushFromUrl(content['jump_uri']),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Text(content['jump_text']),
-                ),
+                child: Text(content['jump_text']),
               ),
             ],
             if ((content['jump_text_2'] as String?)?.isNotEmpty == true &&
@@ -740,10 +744,7 @@ class ChatItem extends StatelessWidget {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => PiliScheme.routePushFromUrl(content['jump_uri_2']),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Text(content['jump_text_2']),
-                ),
+                child: Text(content['jump_text_2']),
               ),
             ],
             if ((content['jump_text_3'] as String?)?.isNotEmpty == true &&
@@ -752,10 +753,7 @@ class ChatItem extends StatelessWidget {
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => PiliScheme.routePushFromUrl(content['jump_uri_3']),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Text(content['jump_text_3']),
-                ),
+                child: Text(content['jump_text_3']),
               ),
             ],
           ],
@@ -774,7 +772,7 @@ class ChatItem extends StatelessWidget {
           child: GestureDetector(
             onTap: url == null ? null : () => PiliScheme.routePushFromUrl(url),
             child: CachedNetworkImage(
-              imageUrl: ImageUtil.thumbnailUrl(content['pic_url']),
+              imageUrl: ImageUtils.thumbnailUrl(content['pic_url']),
             ),
           ),
         ),

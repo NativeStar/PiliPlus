@@ -73,7 +73,7 @@ class ReplyGrpc {
         mainListReply.replies.removeWhere((item) {
           final hasMatch = needRemoveGrpc(item);
           if (!hasMatch && item.replies.isNotEmpty) {
-            item.replies.removeWhere((i) => needRemoveGrpc(i));
+            item.replies.removeWhere(needRemoveGrpc);
           }
           return hasMatch;
         });
@@ -103,8 +103,7 @@ class ReplyGrpc {
       ),
       DetailListReply.fromBuffer,
     );
-    return res
-      ..dataOrNull?.root.replies.removeWhere((item) => needRemoveGrpc(item));
+    return res..dataOrNull?.root.replies.removeWhere(needRemoveGrpc);
   }
 
   static Future<LoadingState<DialogListReply>> dialogList({
@@ -125,7 +124,7 @@ class ReplyGrpc {
       ),
       DialogListReply.fromBuffer,
     );
-    return res..dataOrNull?.replies.removeWhere((item) => needRemoveGrpc(item));
+    return res..dataOrNull?.replies.removeWhere(needRemoveGrpc);
   }
 
   static Future<LoadingState<SearchItemReply>> searchItem({

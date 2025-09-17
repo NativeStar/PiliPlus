@@ -15,7 +15,8 @@ import 'package:PiliPlus/pages/video/introduction/pgc/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/pgc/widgets/pgc_panel.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/action_item.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/triple_state.dart';
-import 'package:PiliPlus/utils/num_util.dart';
+import 'package:PiliPlus/utils/extension.dart';
+import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -27,6 +28,7 @@ class PgcIntroPage extends StatefulWidget {
   final Function showEpisodes;
   final Function showIntroDetail;
   final double maxWidth;
+  final bool isLandscape;
 
   const PgcIntroPage({
     super.key,
@@ -35,34 +37,33 @@ class PgcIntroPage extends StatefulWidget {
     required this.showEpisodes,
     required this.showIntroDetail,
     required this.maxWidth,
+    required this.isLandscape,
   });
 
   @override
   State<PgcIntroPage> createState() => _PgcIntroPageState();
 }
 
-class _PgcIntroPageState extends TripleState<PgcIntroPage>
-    with AutomaticKeepAliveClientMixin {
+class _PgcIntroPageState extends TripleState<PgcIntroPage> {
   @override
-  late PgcIntroController introController;
-  late VideoDetailController videoDetailCtr;
-
-  @override
-  bool get wantKeepAlive => true;
+  late final PgcIntroController introController;
+  late final VideoDetailController videoDetailCtr;
 
   @override
   void initState() {
     super.initState();
-    introController = Get.put(PgcIntroController(), tag: widget.heroTag);
+    introController = Get.putOrFind(
+      PgcIntroController.new,
+      tag: widget.heroTag,
+    );
     videoDetailCtr = Get.find<VideoDetailController>(tag: widget.heroTag);
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final ThemeData theme = Theme.of(context);
     final item = introController.pgcItem;
-    final isLandscape = context.isLandscape;
+    final isLandscape = widget.isLandscape;
     Widget sliver = SliverToBoxAdapter(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,6 +408,7 @@ class _PgcIntroPageState extends TripleState<PgcIntroPage>
     return SizedBox(
       height: 48,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Obx(
             () => ActionItem(
@@ -415,7 +417,7 @@ class _PgcIntroPageState extends TripleState<PgcIntroPage>
               selectIcon: const Icon(FontAwesomeIcons.solidThumbsUp),
               selectStatus: introController.hasLike.value,
               semanticsLabel: '点赞',
-              text: NumUtil.numFormat(item.stat!.like),
+              text: NumUtils.numFormat(item.stat!.like),
               onStartTriple: onStartTriple,
               onCancelTriple: onCancelTriple,
             ),
@@ -428,7 +430,7 @@ class _PgcIntroPageState extends TripleState<PgcIntroPage>
               onTap: introController.actionCoinVideo,
               selectStatus: introController.hasCoin,
               semanticsLabel: '投币',
-              text: NumUtil.numFormat(item.stat!.coin),
+              text: NumUtils.numFormat(item.stat!.coin),
             ),
           ),
           Obx(
@@ -443,7 +445,7 @@ class _PgcIntroPageState extends TripleState<PgcIntroPage>
               ),
               selectStatus: introController.hasFav.value,
               semanticsLabel: '收藏',
-              text: NumUtil.numFormat(item.stat!.favorite),
+              text: NumUtils.numFormat(item.stat!.favorite),
             ),
           ),
           Obx(
@@ -462,7 +464,7 @@ class _PgcIntroPageState extends TripleState<PgcIntroPage>
             onTap: () => introController.actionShareVideo(context),
             selectStatus: false,
             semanticsLabel: '转发',
-            text: NumUtil.numFormat(item.stat!.share),
+            text: NumUtils.numFormat(item.stat!.share),
           ),
         ],
       ),

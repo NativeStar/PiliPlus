@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
+import 'package:PiliPlus/common/widgets/marquee.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/video/audio_quality.dart';
 import 'package:PiliPlus/models/common/video/cdn_type.dart';
@@ -25,16 +27,15 @@ import 'package:PiliPlus/plugin/pl_player/utils/fullscreen.dart';
 import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/extension.dart';
-import 'package:PiliPlus/utils/image_util.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:PiliPlus/utils/video_utils.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
-import 'package:document_file_save_plus/document_file_save_plus_platform_interface.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:floating/floating.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -42,10 +43,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart' show DateFormat;
-import 'package:marquee/marquee.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:share_plus/share_plus.dart';
 
 class HeaderControl extends StatefulWidget {
   const HeaderControl({
@@ -55,6 +54,7 @@ class HeaderControl extends StatefulWidget {
     required this.heroTag,
     super.key,
   });
+
   final bool isPortrait;
   final PlPlayerController controller;
   final VideoDetailController videoDetailCtr;
@@ -70,6 +70,7 @@ class HeaderControlState extends TripleState<HeaderControl> {
   late final PlayUrlModel videoInfo = videoDetailCtr.data;
   static const TextStyle subTitleStyle = TextStyle(fontSize: 12);
   static const TextStyle titleStyle = TextStyle(fontSize: 14);
+
   String get heroTag => widget.heroTag;
   late final UgcIntroController ugcIntroController;
   late final PgcIntroController pgcIntroController;
@@ -77,12 +78,15 @@ class HeaderControlState extends TripleState<HeaderControl> {
   late CommonIntroController introController = videoDetailCtr.isUgc
       ? ugcIntroController
       : pgcIntroController;
+
   bool get isPortrait => widget.isPortrait;
   late final horizontalScreen = videoDetailCtr.horizontalScreen;
   RxString now = ''.obs;
   Timer? clock;
+
   bool get isFullScreen => plPlayerController.isFullScreen.value;
   Box setting = GStorage.setting;
+  late final provider = ContextSingleTicker(context, autoStart: false);
 
   @override
   void initState() {
@@ -154,7 +158,7 @@ class HeaderControlState extends TripleState<HeaderControl> {
                     dense: true,
                     onTap: () {
                       Get.back();
-                      ImageUtil.downloadImg(
+                      ImageUtils.downloadImg(
                         context,
                         [widget.videoDetailCtr.cover.value],
                       );
@@ -176,7 +180,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
                   onTap: () {
                     Get.back();
                     videoDetailCtr.queryVideoUrl(
-                      videoDetailCtr.playedTime,
+                      defaultST: videoDetailCtr.playedTime,
+                      fromReset: true,
                     );
                   },
                   leading: const Icon(Icons.refresh_outlined, size: 20),
@@ -277,9 +282,9 @@ class HeaderControlState extends TripleState<HeaderControl> {
                       SmartDialog.showToast(
                         '已设置为 ${CDNService.fromCode(result).desc}，正在重载视频',
                       );
-                      setState(() {});
                       videoDetailCtr.queryVideoUrl(
-                        videoDetailCtr.playedTime,
+                        defaultST: videoDetailCtr.playedTime,
+                        fromReset: true,
                       );
                     }
                   },
@@ -361,7 +366,7 @@ class HeaderControlState extends TripleState<HeaderControl> {
                   leading: const Icon(Icons.play_circle_outline, size: 20),
                   title: const Text('选择画质', style: titleStyle),
                   subtitle: Text(
-                    '当前画质 ${videoDetailCtr.currentVideoQa.desc}',
+                    '当前画质 ${videoDetailCtr.currentVideoQa.value.desc}',
                     style: subTitleStyle,
                   ),
                 ),
@@ -437,15 +442,19 @@ class HeaderControlState extends TripleState<HeaderControl> {
                   dense: true,
                   title: const Text('播放信息', style: titleStyle),
                   leading: const Icon(Icons.info_outline, size: 20),
-                  onTap: () {
-                    Player? player = plPlayerController.videoPlayerController;
+                  onTap: () async {
+                    final player = plPlayerController.videoPlayerController;
                     if (player == null) {
                       SmartDialog.showToast('播放器未初始化');
                       return;
                     }
+                    final hwdec = await (player.platform as NativePlayer)
+                        .getProperty('hwdec-current');
+                    if (!context.mounted) return;
                     showDialog(
                       context: context,
                       builder: (context) {
+                        final state = player.state;
                         return AlertDialog(
                           title: const Text('播放信息'),
                           content: SingleChildScrollView(
@@ -455,10 +464,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                                   dense: true,
                                   title: const Text("Resolution"),
                                   subtitle: Text(
-                                    '${player.state.width}x${player.state.height}',
+                                    '${state.width}x${state.height}',
                                   ),
                                   onTap: () => Utils.copyText(
-                                    'Resolution\n${player.state.width}x${player.state.height}',
+                                    'Resolution\n${state.width}x${state.height}',
                                     needToast: false,
                                   ),
                                 ),
@@ -466,10 +475,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                                   dense: true,
                                   title: const Text("VideoParams"),
                                   subtitle: Text(
-                                    player.state.videoParams.toString(),
+                                    state.videoParams.toString(),
                                   ),
                                   onTap: () => Utils.copyText(
-                                    'VideoParams\n${player.state.videoParams}',
+                                    'VideoParams\n${state.videoParams}',
                                     needToast: false,
                                   ),
                                 ),
@@ -477,10 +486,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                                   dense: true,
                                   title: const Text("AudioParams"),
                                   subtitle: Text(
-                                    player.state.audioParams.toString(),
+                                    state.audioParams.toString(),
                                   ),
                                   onTap: () => Utils.copyText(
-                                    'AudioParams\n${player.state.audioParams}',
+                                    'AudioParams\n${state.audioParams}',
                                     needToast: false,
                                   ),
                                 ),
@@ -488,10 +497,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                                   dense: true,
                                   title: const Text("Media"),
                                   subtitle: Text(
-                                    player.state.playlist.toString(),
+                                    state.playlist.toString(),
                                   ),
                                   onTap: () => Utils.copyText(
-                                    'Media\n${player.state.playlist}',
+                                    'Media\n${state.playlist}',
                                     needToast: false,
                                   ),
                                 ),
@@ -499,10 +508,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                                   dense: true,
                                   title: const Text("AudioTrack"),
                                   subtitle: Text(
-                                    player.state.track.audio.toString(),
+                                    state.track.audio.toString(),
                                   ),
                                   onTap: () => Utils.copyText(
-                                    'AudioTrack\n${player.state.track.audio}',
+                                    'AudioTrack\n${state.track.audio}',
                                     needToast: false,
                                   ),
                                 ),
@@ -510,28 +519,28 @@ class HeaderControlState extends TripleState<HeaderControl> {
                                   dense: true,
                                   title: const Text("VideoTrack"),
                                   subtitle: Text(
-                                    player.state.track.video.toString(),
+                                    state.track.video.toString(),
                                   ),
                                   onTap: () => Utils.copyText(
-                                    'VideoTrack\n${player.state.track.audio}',
+                                    'VideoTrack\n${state.track.audio}',
                                     needToast: false,
                                   ),
                                 ),
                                 ListTile(
                                   dense: true,
                                   title: const Text("pitch"),
-                                  subtitle: Text(player.state.pitch.toString()),
+                                  subtitle: Text(state.pitch.toString()),
                                   onTap: () => Utils.copyText(
-                                    'pitch\n${player.state.pitch}',
+                                    'pitch\n${state.pitch}',
                                     needToast: false,
                                   ),
                                 ),
                                 ListTile(
                                   dense: true,
                                   title: const Text("rate"),
-                                  subtitle: Text(player.state.rate.toString()),
+                                  subtitle: Text(state.rate.toString()),
                                   onTap: () => Utils.copyText(
-                                    'rate\n${player.state.rate}',
+                                    'rate\n${state.rate}',
                                     needToast: false,
                                   ),
                                 ),
@@ -539,10 +548,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                                   dense: true,
                                   title: const Text("AudioBitrate"),
                                   subtitle: Text(
-                                    player.state.audioBitrate.toString(),
+                                    state.audioBitrate.toString(),
                                   ),
                                   onTap: () => Utils.copyText(
-                                    'AudioBitrate\n${player.state.audioBitrate}',
+                                    'AudioBitrate\n${state.audioBitrate}',
                                     needToast: false,
                                   ),
                                 ),
@@ -550,10 +559,19 @@ class HeaderControlState extends TripleState<HeaderControl> {
                                   dense: true,
                                   title: const Text("Volume"),
                                   subtitle: Text(
-                                    player.state.volume.toString(),
+                                    state.volume.toString(),
                                   ),
                                   onTap: () => Utils.copyText(
-                                    'Volume\n${player.state.volume}',
+                                    'Volume\n${state.volume}',
+                                    needToast: false,
+                                  ),
+                                ),
+                                ListTile(
+                                  dense: true,
+                                  title: const Text('hwdec'),
+                                  subtitle: Text(hwdec),
+                                  onTap: () => Utils.copyText(
+                                    'hwdec\n$hwdec',
                                     needToast: false,
                                   ),
                                 ),
@@ -604,7 +622,7 @@ class HeaderControlState extends TripleState<HeaderControl> {
       return;
     }
     final List<FormatItem> videoFormat = videoInfo.supportFormats!;
-    final VideoQuality currentVideoQa = videoDetailCtr.currentVideoQa;
+    final VideoQuality currentVideoQa = videoDetailCtr.currentVideoQa.value;
 
     /// 总质量分类
     final int totalQaSam = videoFormat.length;
@@ -663,28 +681,22 @@ class HeaderControlState extends TripleState<HeaderControl> {
                       }
                       Get.back();
                       final int quality = item.quality!;
+                      final newQa = VideoQuality.fromCode(quality);
                       videoDetailCtr
-                        ..currentVideoQa = VideoQuality.fromCode(quality)
+                        ..currentVideoQa.value = newQa
                         ..updatePlayer();
+
+                      SmartDialog.showToast("画质已变为：${newQa.desc}");
 
                       // update
                       if (!plPlayerController.tempPlayerConf) {
-                        final res = await Connectivity().checkConnectivity();
-                        if (res.contains(ConnectivityResult.wifi)) {
-                          setting.put(
-                            SettingBoxKey.defaultVideoQa,
-                            quality,
-                          );
-                        } else {
-                          setting.put(
-                            SettingBoxKey.defaultVideoQaCellular,
-                            quality,
-                          );
-                        }
+                        setting.put(
+                          await Utils.isWiFi
+                              ? SettingBoxKey.defaultVideoQa
+                              : SettingBoxKey.defaultVideoQaCellular,
+                          quality,
+                        );
                       }
-                      SmartDialog.showToast(
-                        "画质已变为：${VideoQuality.fromCode(quality).desc}",
-                      );
                     },
                     // 可能包含会员解锁画质
                     enabled: index >= totalQaSam - userfulQaSam,
@@ -740,28 +752,22 @@ class HeaderControlState extends TripleState<HeaderControl> {
                       }
                       Get.back();
                       final int quality = i.id!;
+                      final newQa = AudioQuality.fromCode(quality);
                       videoDetailCtr
-                        ..currentAudioQa = AudioQuality.fromCode(quality)
+                        ..currentAudioQa = newQa
                         ..updatePlayer();
+
+                      SmartDialog.showToast("音质已变为：${newQa.desc}");
 
                       // update
                       if (!plPlayerController.tempPlayerConf) {
-                        final res = await Connectivity().checkConnectivity();
-                        if (res.contains(ConnectivityResult.wifi)) {
-                          setting.put(
-                            SettingBoxKey.defaultAudioQa,
-                            quality,
-                          );
-                        } else {
-                          setting.put(
-                            SettingBoxKey.defaultAudioQaCellular,
-                            quality,
-                          );
-                        }
+                        setting.put(
+                          await Utils.isWiFi
+                              ? SettingBoxKey.defaultAudioQa
+                              : SettingBoxKey.defaultAudioQaCellular,
+                          quality,
+                        );
                       }
-                      SmartDialog.showToast(
-                        "音质已变为：${AudioQuality.fromCode(quality).desc}",
-                      );
                     },
                     contentPadding: const EdgeInsets.only(left: 20, right: 20),
                     title: Text(i.quality),
@@ -826,12 +832,12 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         ListTile(
                           dense: true,
                           onTap: () {
-                            if (i.startsWith(currentDecodeFormats.code)) {
+                            if (currentDecodeFormats.codes.any(i.startsWith)) {
                               return;
                             }
                             videoDetailCtr
                               ..currentDecodeFormats =
-                                  VideoDecodeFormatTypeExt.fromString(i)!
+                                  VideoDecodeFormatType.fromString(i)
                               ..updatePlayer();
                             Get.back();
                           },
@@ -840,13 +846,13 @@ class HeaderControlState extends TripleState<HeaderControl> {
                             right: 20,
                           ),
                           title: Text(
-                            VideoDecodeFormatTypeExt.fromString(i)!.description,
+                            VideoDecodeFormatType.fromString(i).description,
                           ),
                           subtitle: Text(
                             i,
                             style: subTitleStyle,
                           ),
-                          trailing: i.startsWith(currentDecodeFormats.code)
+                          trailing: currentDecodeFormats.codes.any(i.startsWith)
                               ? Icon(
                                   Icons.done,
                                   color: theme.colorScheme.primary,
@@ -887,33 +893,23 @@ class HeaderControlState extends TripleState<HeaderControl> {
                             options: Options(responseType: ResponseType.bytes),
                           );
                           if (res.statusCode == 200) {
+                            final Uint8List bytes = res.data;
                             final name =
                                 '${introController.videoDetail.value.title}-${videoDetailCtr.bvid}-${videoDetailCtr.cid.value}-${item.lanDoc}.json';
-                            try {
-                              DocumentFileSavePlusPlatform.instance
-                                  .saveMultipleFiles(
-                                    dataList: [res.data],
-                                    fileNameList: [name],
-                                    mimeTypeList: [Headers.jsonContentType],
-                                  );
-                              if (Platform.isAndroid) {
-                                SmartDialog.showToast('已保存');
-                              }
-                            } catch (e) {
-                              SharePlus.instance.share(
-                                ShareParams(
-                                  files: [
-                                    XFile.fromData(
-                                      res.data,
-                                      name: name,
-                                      mimeType: Headers.jsonContentType,
-                                    ),
-                                  ],
-                                  sharePositionOrigin:
-                                      await Utils.sharePositionOrigin,
-                                ),
-                              );
+                            final path = await FilePicker.platform.saveFile(
+                              allowedExtensions: ['json'],
+                              type: FileType.custom,
+                              fileName: name,
+                              bytes: Utils.isDesktop ? null : bytes,
+                            );
+                            if (path == null) {
+                              SmartDialog.showToast("取消保存");
+                              return;
                             }
+                            if (Utils.isDesktop) {
+                              await File(path).writeAsBytes(bytes);
+                            }
+                            SmartDialog.showToast("已保存");
                           }
                         } catch (e) {
                           SmartDialog.showToast(e.toString());
@@ -957,80 +953,59 @@ class HeaderControlState extends TripleState<HeaderControl> {
           thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
         );
 
-        void updateStrokeWidth(double val, {bool isEnd = true}) {
+        void updateStrokeWidth(double val) {
           subtitleStrokeWidth = val;
           plPlayerController
             ..subtitleStrokeWidth = subtitleStrokeWidth
             ..updateSubtitleStyle();
-          if (isEnd) {
-            plPlayerController.putSubtitleSettings();
-          }
           setState(() {});
         }
 
-        void updateOpacity(double val, {bool isEnd = true}) {
+        void updateOpacity(double val) {
           subtitleBgOpaticy = val.toPrecision(2);
           plPlayerController
             ..subtitleBgOpaticy = subtitleBgOpaticy
             ..updateSubtitleStyle();
-          if (isEnd) {
-            plPlayerController.putSubtitleSettings();
-          }
           setState(() {});
         }
 
-        void updateBottomPadding(double val, {bool isEnd = true}) {
+        void updateBottomPadding(double val) {
           subtitlePaddingB = val.round();
           plPlayerController
             ..subtitlePaddingB = subtitlePaddingB
             ..updateSubtitleStyle();
-          if (isEnd) {
-            plPlayerController.putSubtitleSettings();
-          }
           setState(() {});
         }
 
-        void updateHorizontalPadding(double val, {bool isEnd = true}) {
+        void updateHorizontalPadding(double val) {
           subtitlePaddingH = val.round();
           plPlayerController
             ..subtitlePaddingH = subtitlePaddingH
             ..updateSubtitleStyle();
-          if (isEnd) {
-            plPlayerController.putSubtitleSettings();
-          }
           setState(() {});
         }
 
-        void updateFontScaleFS(double val, {bool isEnd = true}) {
+        void updateFontScaleFS(double val) {
           subtitleFontScaleFS = val;
           plPlayerController
             ..subtitleFontScaleFS = subtitleFontScaleFS
             ..updateSubtitleStyle();
-          if (isEnd) {
-            plPlayerController.putSubtitleSettings();
-          }
           setState(() {});
         }
 
-        void updateFontScale(double val, {bool isEnd = true}) {
+        void updateFontScale(double val) {
           subtitleFontScale = val;
           plPlayerController
             ..subtitleFontScale = subtitleFontScale
             ..updateSubtitleStyle();
-          if (isEnd) {
-            plPlayerController.putSubtitleSettings();
-          }
           setState(() {});
         }
 
-        void updateFontWeight(double val, {bool isEnd = true}) {
+        void updateFontWeight(double val) {
           subtitleFontWeight = val.toInt();
           plPlayerController
             ..subtitleFontWeight = subtitleFontWeight
             ..updateSubtitleStyle();
-          if (isEnd) {
-            plPlayerController.putSubtitleSettings();
-          }
           setState(() {});
         }
 
@@ -1075,8 +1050,9 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         divisions: 20,
                         label:
                             '${(subtitleFontScale * 100).toStringAsFixed(1)}%',
-                        onChanged: (val) => updateFontScale(val, isEnd: false),
-                        onChangeEnd: updateFontScale,
+                        onChanged: updateFontScale,
+                        onChangeEnd: (_) =>
+                            plPlayerController.putSubtitleSettings(),
                       ),
                     ),
                   ),
@@ -1105,9 +1081,9 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         divisions: 20,
                         label:
                             '${(subtitleFontScaleFS * 100).toStringAsFixed(1)}%',
-                        onChanged: (val) =>
-                            updateFontScaleFS(val, isEnd: false),
-                        onChangeEnd: updateFontScaleFS,
+                        onChanged: updateFontScaleFS,
+                        onChangeEnd: (_) =>
+                            plPlayerController.putSubtitleSettings,
                       ),
                     ),
                   ),
@@ -1133,8 +1109,9 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: subtitleFontWeight.toDouble(),
                         divisions: 8,
                         label: '${subtitleFontWeight + 1}',
-                        onChanged: (val) => updateFontWeight(val, isEnd: false),
-                        onChangeEnd: updateFontWeight,
+                        onChanged: updateFontWeight,
+                        onChangeEnd: (_) =>
+                            plPlayerController.putSubtitleSettings(),
                       ),
                     ),
                   ),
@@ -1160,9 +1137,9 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: subtitleStrokeWidth,
                         divisions: 10,
                         label: '$subtitleStrokeWidth',
-                        onChanged: (val) =>
-                            updateStrokeWidth(val, isEnd: false),
-                        onChangeEnd: updateStrokeWidth,
+                        onChanged: updateStrokeWidth,
+                        onChangeEnd: (_) =>
+                            plPlayerController.putSubtitleSettings(),
                       ),
                     ),
                   ),
@@ -1188,9 +1165,9 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: subtitlePaddingH.toDouble(),
                         divisions: 100,
                         label: '$subtitlePaddingH',
-                        onChanged: (val) =>
-                            updateHorizontalPadding(val, isEnd: false),
-                        onChangeEnd: updateHorizontalPadding,
+                        onChanged: updateHorizontalPadding,
+                        onChangeEnd: (_) =>
+                            plPlayerController.putSubtitleSettings(),
                       ),
                     ),
                   ),
@@ -1216,9 +1193,9 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: subtitlePaddingB.toDouble(),
                         divisions: 200,
                         label: '$subtitlePaddingB',
-                        onChanged: (val) =>
-                            updateBottomPadding(val, isEnd: false),
-                        onChangeEnd: updateBottomPadding,
+                        onChanged: updateBottomPadding,
+                        onChangeEnd: (_) =>
+                            plPlayerController.putSubtitleSettings(),
                       ),
                     ),
                   ),
@@ -1242,8 +1219,9 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         min: 0,
                         max: 1,
                         value: subtitleBgOpaticy,
-                        onChanged: (val) => updateOpacity(val, isEnd: false),
-                        onChangeEnd: updateOpacity,
+                        onChanged: updateOpacity,
+                        onChangeEnd: (_) =>
+                            plPlayerController.putSubtitleSettings(),
                       ),
                     ),
                   ),
@@ -1315,13 +1293,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
         );
 
-        void updateLineHeight(double val, {bool isEnd = true}) {
+        void updateLineHeight(double val) {
           danmakuLineHeight = val.toPrecision(1);
-          if (isEnd) {
-            plPlayerController
-              ..danmakuLineHeight = danmakuLineHeight
-              ..putDanmakuSettings();
-          }
           setState(() {});
           try {
             danmakuController?.updateOption(
@@ -1332,13 +1305,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           } catch (_) {}
         }
 
-        void updateDuration(double val, {bool isEnd = true}) {
+        void updateDuration(double val) {
           danmakuDuration = val.toPrecision(1);
-          if (isEnd) {
-            plPlayerController
-              ..danmakuDuration = danmakuDuration
-              ..putDanmakuSettings();
-          }
           setState(() {});
           try {
             danmakuController?.updateOption(
@@ -1349,13 +1317,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           } catch (_) {}
         }
 
-        void updateStaticDuration(double val, {bool isEnd = true}) {
+        void updateStaticDuration(double val) {
           danmakuStaticDuration = val.toPrecision(1);
-          if (isEnd) {
-            plPlayerController
-              ..danmakuStaticDuration = danmakuStaticDuration
-              ..putDanmakuSettings();
-          }
           setState(() {});
           try {
             danmakuController?.updateOption(
@@ -1367,13 +1330,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           } catch (_) {}
         }
 
-        void updateFontSizeFS(double val, {bool isEnd = true}) {
+        void updateFontSizeFS(double val) {
           fontSizeFS = val;
-          if (isEnd) {
-            plPlayerController
-              ..danmakuFontScaleFS = fontSizeFS
-              ..putDanmakuSettings();
-          }
           setState(() {});
           if (isFullScreen) {
             try {
@@ -1386,13 +1344,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           }
         }
 
-        void updateFontSize(double val, {bool isEnd = true}) {
+        void updateFontSize(double val) {
           fontSize = val;
-          if (isEnd) {
-            plPlayerController
-              ..danmakuFontScale = fontSize
-              ..putDanmakuSettings();
-          }
           setState(() {});
           if (!isFullScreen) {
             try {
@@ -1405,13 +1358,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           }
         }
 
-        void updateStrokeWidth(double val, {bool isEnd = true}) {
+        void updateStrokeWidth(double val) {
           strokeWidth = val;
-          if (isEnd) {
-            plPlayerController
-              ..strokeWidth = val
-              ..putDanmakuSettings();
-          }
           setState(() {});
           try {
             danmakuController?.updateOption(
@@ -1420,13 +1368,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           } catch (_) {}
         }
 
-        void updateFontWeight(double val, {bool isEnd = true}) {
+        void updateFontWeight(double val) {
           fontWeight = val.toInt();
-          if (isEnd) {
-            plPlayerController
-              ..fontWeight = fontWeight
-              ..putDanmakuSettings();
-          }
           setState(() {});
           try {
             danmakuController?.updateOption(
@@ -1435,13 +1378,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           } catch (_) {}
         }
 
-        void updateOpacity(double val, {bool isEnd = true}) {
+        void updateOpacity(double val) {
           opacity = val;
-          if (isEnd) {
-            plPlayerController
-              ..danmakuOpacity = opacity
-              ..putDanmakuSettings();
-          }
           setState(() {});
           try {
             danmakuController?.updateOption(
@@ -1450,13 +1388,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           } catch (_) {}
         }
 
-        void updateShowArea(double val, {bool isEnd = true}) {
+        void updateShowArea(double val) {
           showArea = val.toPrecision(1);
-          if (isEnd) {
-            plPlayerController
-              ..showArea = showArea
-              ..putDanmakuSettings();
-          }
           setState(() {});
           try {
             danmakuController?.updateOption(
@@ -1465,13 +1398,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
           } catch (_) {}
         }
 
-        void updateDanmakuWeight(double val, {bool isEnd = true}) {
+        void updateDanmakuWeight(double val) {
           danmakuWeight = val.toInt();
-          if (isEnd) {
-            plPlayerController
-              ..danmakuWeight = danmakuWeight
-              ..putDanmakuSettings();
-          }
           setState(() {});
         }
 
@@ -1528,9 +1456,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: danmakuWeight.toDouble(),
                         divisions: 10,
                         label: '$danmakuWeight',
-                        onChanged: (val) =>
-                            updateDanmakuWeight(val, isEnd: false),
-                        onChangeEnd: updateDanmakuWeight,
+                        onChanged: updateDanmakuWeight,
+                        onChangeEnd: (_) => plPlayerController
+                          ..danmakuWeight = danmakuWeight
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1610,8 +1539,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: showArea,
                         divisions: 9,
                         label: '${showArea * 100}%',
-                        onChanged: (val) => updateShowArea(val, isEnd: false),
-                        onChangeEnd: updateShowArea,
+                        onChanged: updateShowArea,
+                        onChangeEnd: (_) => plPlayerController
+                          ..showArea = showArea
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1637,8 +1568,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: opacity,
                         divisions: 10,
                         label: '${opacity * 100}%',
-                        onChanged: (val) => updateOpacity(val, isEnd: false),
-                        onChangeEnd: updateOpacity,
+                        onChanged: updateOpacity,
+                        onChangeEnd: (_) => plPlayerController
+                          ..danmakuOpacity = opacity
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1664,8 +1597,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: fontWeight.toDouble(),
                         divisions: 8,
                         label: '${fontWeight + 1}',
-                        onChanged: (val) => updateFontWeight(val, isEnd: false),
-                        onChangeEnd: updateFontWeight,
+                        onChanged: updateFontWeight,
+                        onChangeEnd: (_) => plPlayerController
+                          ..fontWeight = fontWeight
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1687,13 +1622,14 @@ class HeaderControlState extends TripleState<HeaderControl> {
                       data: sliderTheme,
                       child: Slider(
                         min: 0,
-                        max: 3,
+                        max: 5,
                         value: strokeWidth,
-                        divisions: 6,
+                        divisions: 10,
                         label: '$strokeWidth',
-                        onChanged: (val) =>
-                            updateStrokeWidth(val, isEnd: false),
-                        onChangeEnd: updateStrokeWidth,
+                        onChanged: updateStrokeWidth,
+                        onChangeEnd: (_) => plPlayerController
+                          ..strokeWidth = strokeWidth
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1719,8 +1655,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: fontSize,
                         divisions: 20,
                         label: '${(fontSize * 100).toStringAsFixed(1)}%',
-                        onChanged: (val) => updateFontSize(val, isEnd: false),
-                        onChangeEnd: updateFontSize,
+                        onChanged: updateFontSize,
+                        onChangeEnd: (_) => plPlayerController
+                          ..danmakuFontScale = fontSize
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1746,8 +1684,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: fontSizeFS,
                         divisions: 20,
                         label: '${(fontSizeFS * 100).toStringAsFixed(1)}%',
-                        onChanged: (val) => updateFontSizeFS(val, isEnd: false),
-                        onChangeEnd: updateFontSizeFS,
+                        onChanged: updateFontSizeFS,
+                        onChangeEnd: (_) => plPlayerController
+                          ..danmakuFontScaleFS = fontSizeFS
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1773,8 +1713,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: danmakuDuration,
                         divisions: 49,
                         label: danmakuDuration.toString(),
-                        onChanged: (val) => updateDuration(val, isEnd: false),
-                        onChangeEnd: updateDuration,
+                        onChanged: updateDuration,
+                        onChangeEnd: (_) => plPlayerController
+                          ..danmakuDuration = danmakuDuration
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1800,9 +1742,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         value: danmakuStaticDuration,
                         divisions: 49,
                         label: danmakuStaticDuration.toString(),
-                        onChanged: (val) =>
-                            updateStaticDuration(val, isEnd: false),
-                        onChangeEnd: updateStaticDuration,
+                        onChanged: updateStaticDuration,
+                        onChangeEnd: (_) => plPlayerController
+                          ..danmakuStaticDuration = danmakuStaticDuration
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1826,8 +1769,10 @@ class HeaderControlState extends TripleState<HeaderControl> {
                         min: 1.0,
                         max: 3.0,
                         value: danmakuLineHeight,
-                        onChanged: (val) => updateLineHeight(val, isEnd: false),
-                        onChangeEnd: updateLineHeight,
+                        onChanged: updateLineHeight,
+                        onChangeEnd: (_) => plPlayerController
+                          ..danmakuLineHeight = danmakuLineHeight
+                          ..putDanmakuSettings(),
                       ),
                     ),
                   ),
@@ -1956,81 +1901,37 @@ class HeaderControlState extends TripleState<HeaderControl> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        return Obx(
-                          () {
-                            String title;
-                            final videoDetail =
-                                introController.videoDetail.value;
-                            if (videoDetail.videos == 1) {
-                              title = videoDetail.title!;
-                            } else {
-                              title =
-                                  videoDetail.pages
-                                      ?.firstWhereOrNull(
-                                        (e) =>
-                                            e.cid == videoDetailCtr.cid.value,
-                                      )
-                                      ?.pagePart ??
-                                  videoDetail.title!;
-                            }
-                            final textPainter = TextPainter(
-                              text: TextSpan(
-                                text: title,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              textDirection: TextDirection.ltr,
-                              maxLines: 1,
-                            )..layout(maxWidth: constraints.maxWidth);
-                            if (textPainter.didExceedMaxLines) {
-                              return ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxHeight: 25,
-                                ),
-                                child: Marquee(
-                                  text: title,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                  ),
-                                  scrollAxis: Axis.horizontal,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  blankSpace: 200,
-                                  velocity: 40,
-                                  startAfter: const Duration(seconds: 1),
-                                  showFadingOnlyWhenScrolling: true,
-                                  fadingEdgeStartFraction: 0,
-                                  fadingEdgeEndFraction: 0.1,
-                                  numberOfRounds: 1,
-                                  startPadding: 0,
-                                  accelerationDuration: const Duration(
-                                    seconds: 1,
-                                  ),
-                                  accelerationCurve: Curves.linear,
-                                  decelerationDuration: const Duration(
-                                    milliseconds: 500,
-                                  ),
-                                  decelerationCurve: Curves.easeOut,
-                                ),
-                              );
-                            } else {
-                              return Text(
-                                title,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
-                                maxLines: 1,
-                                textDirection: TextDirection.ltr,
-                              );
-                            }
-                          },
-                        );
-                      },
+                    Padding(
+                      padding: isPortrait
+                          ? EdgeInsets.zero
+                          : const EdgeInsets.only(right: 10),
+                      child: Obx(
+                        () {
+                          final videoDetail = introController.videoDetail.value;
+                          final String title;
+                          if (videoDetail.videos == 1) {
+                            title = videoDetail.title!;
+                          } else {
+                            title =
+                                videoDetail.pages
+                                    ?.firstWhereOrNull(
+                                      (e) => e.cid == videoDetailCtr.cid.value,
+                                    )
+                                    ?.pagePart ??
+                                videoDetail.title!;
+                          }
+                          return MarqueeText(
+                            title,
+                            spacing: 30,
+                            velocity: 30,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                            provider: provider,
+                          );
+                        },
+                      ),
                     ),
                     if (introController.isShowOnlineTotal)
                       Obx(
@@ -2071,8 +1972,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
                 height: 34,
                 child: IconButton(
                   tooltip: '提交片段',
-                  style: ButtonStyle(
-                    padding: WidgetStateProperty.all(EdgeInsets.zero),
+                  style: const ButtonStyle(
+                    padding: WidgetStatePropertyAll(EdgeInsets.zero),
                   ),
                   onPressed: () => videoDetailCtr.onBlock(context),
                   icon: const Stack(
@@ -2100,8 +2001,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
                       height: 34,
                       child: IconButton(
                         tooltip: '片段信息',
-                        style: ButtonStyle(
-                          padding: WidgetStateProperty.all(EdgeInsets.zero),
+                        style: const ButtonStyle(
+                          padding: WidgetStatePropertyAll(EdgeInsets.zero),
                         ),
                         onPressed: () => videoDetailCtr.showSBDetail(context),
                         icon: const Icon(
@@ -2118,8 +2019,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
               height: 34,
               child: IconButton(
                 tooltip: '发弹幕',
-                style: ButtonStyle(
-                  padding: WidgetStateProperty.all(EdgeInsets.zero),
+                style: const ButtonStyle(
+                  padding: WidgetStatePropertyAll(EdgeInsets.zero),
                 ),
                 onPressed: videoDetailCtr.showShootDanmakuSheet,
                 icon: const Icon(
@@ -2138,8 +2039,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
                       plPlayerController.enableShowDanmaku.value;
                   return IconButton(
                     tooltip: "${enableShowDanmaku ? '关闭' : '开启'}弹幕",
-                    style: ButtonStyle(
-                      padding: WidgetStateProperty.all(EdgeInsets.zero),
+                    style: const ButtonStyle(
+                      padding: WidgetStatePropertyAll(EdgeInsets.zero),
                     ),
                     onPressed: () {
                       final newVal = !enableShowDanmaku;
@@ -2165,14 +2066,14 @@ class HeaderControlState extends TripleState<HeaderControl> {
                 height: 34,
                 child: IconButton(
                   tooltip: '画中画',
-                  style: ButtonStyle(
-                    padding: WidgetStateProperty.all(EdgeInsets.zero),
+                  style: const ButtonStyle(
+                    padding: WidgetStatePropertyAll(EdgeInsets.zero),
                   ),
                   onPressed: () async {
                     bool canUsePiP = await Floating().isPipAvailable;
                     plPlayerController.hiddenControls(false);
                     if (canUsePiP) {
-                      if (!videoPlayerServiceHandler.enableBackgroundPlay &&
+                      if (!videoPlayerServiceHandler!.enableBackgroundPlay &&
                           mounted) {
                         final theme = Theme.of(context);
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -2256,8 +2157,8 @@ class HeaderControlState extends TripleState<HeaderControl> {
               height: 34,
               child: IconButton(
                 tooltip: "更多设置",
-                style: ButtonStyle(
-                  padding: WidgetStateProperty.all(EdgeInsets.zero),
+                style: const ButtonStyle(
+                  padding: WidgetStatePropertyAll(EdgeInsets.zero),
                 ),
                 onPressed: showSettingSheet,
                 icon: const Icon(
@@ -2272,6 +2173,7 @@ class HeaderControlState extends TripleState<HeaderControl> {
         if (showFSActionItem && isFullScreen)
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
                 width: 42,

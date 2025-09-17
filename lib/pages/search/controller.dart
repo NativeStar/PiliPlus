@@ -10,21 +10,21 @@ import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:stream_transform/stream_transform.dart';
 
-mixin SearchKeywordMixin {
+mixin DebounceStreamMixin<T> {
   Duration duration = const Duration(milliseconds: 200);
-  StreamController<String>? ctr;
-  StreamSubscription<String>? sub;
-  void onKeywordChanged(String value);
+  StreamController<T>? ctr;
+  StreamSubscription<T>? sub;
+  void onValueChanged(T value);
 
   void subInit() {
-    ctr = StreamController<String>();
-    sub = ctr!.stream
-        .debounce(duration, trailing: true)
-        .listen(onKeywordChanged);
+    ctr = StreamController<T>();
+    sub = ctr!.stream.debounce(duration, trailing: true).listen(onValueChanged);
   }
 
   void subDispose() {
@@ -35,8 +35,8 @@ mixin SearchKeywordMixin {
   }
 }
 
-abstract class SearchState<T extends StatefulWidget> extends State<T>
-    with SearchKeywordMixin {
+abstract class DebounceStreamState<T extends StatefulWidget, S> extends State<T>
+    with DebounceStreamMixin<S> {
   @override
   void dispose() {
     subDispose();
@@ -50,7 +50,8 @@ abstract class SearchState<T extends StatefulWidget> extends State<T>
   }
 }
 
-class SSearchController extends GetxController with SearchKeywordMixin {
+class SSearchController extends GetxController
+    with DebounceStreamMixin<String> {
   SSearchController(this.tag);
   final String tag;
 
@@ -70,7 +71,6 @@ class SSearchController extends GetxController with SearchKeywordMixin {
 
   // suggestion
   final bool searchSuggestion = Pref.searchSuggestion;
-
   late final RxList<SearchSuggestItem> searchSuggestList;
 
   // trending
@@ -167,6 +167,13 @@ class SSearchController extends GetxController with SearchKeywordMixin {
       },
     );
     searchFocusNode.requestFocus();
+    if (Utils.isDesktop) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        controller.selection = TextSelection.collapsed(
+          offset: controller.text.length,
+        );
+      });
+    }
   }
 
   // 获取热搜关键词
@@ -187,7 +194,7 @@ class SSearchController extends GetxController with SearchKeywordMixin {
   }
 
   @override
-  Future<void> onKeywordChanged(String value) async {
+  Future<void> onValueChanged(String value) async {
     var res = await SearchHttp.searchSuggest(term: value);
     if (res['status']) {
       SearchSuggestModel data = res['data'];
@@ -208,7 +215,7 @@ class SSearchController extends GetxController with SearchKeywordMixin {
       title: '确定清空搜索历史？',
       onConfirm: () {
         historyList.clear();
-        GStorage.historyWord.put('cacheList', []);
+        GStorage.historyWord.delete('cacheList');
       },
     );
   }

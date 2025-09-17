@@ -10,6 +10,7 @@ import 'package:PiliPlus/models/common/account_type.dart';
 import 'package:PiliPlus/models/login/model.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
@@ -25,23 +26,23 @@ class LoginPageController extends GetxController
   final TextEditingController smsCodeTextController = TextEditingController();
   final TextEditingController cookieTextController = TextEditingController();
 
-  RxMap<String, dynamic> codeInfo = RxMap<String, dynamic>({});
+  late final RxMap<String, dynamic> codeInfo = RxMap<String, dynamic>({});
 
-  late TabController tabController;
+  late final TabController tabController;
 
-  final Gt3FlutterPlugin captcha = Gt3FlutterPlugin();
+  late final Gt3FlutterPlugin captcha = Gt3FlutterPlugin();
 
-  CaptchaDataModel captchaData = CaptchaDataModel();
-  RxInt qrCodeLeftTime = 180.obs;
-  RxString statusQRCode = ''.obs;
+  late final CaptchaDataModel captchaData = CaptchaDataModel();
+  late final RxInt qrCodeLeftTime = 180.obs;
+  late final RxString statusQRCode = ''.obs;
 
   late final List<Map<String, dynamic>> internationalDialingPrefix =
       Constants.internationalDialingPrefix;
   late Map<String, dynamic> selectedCountryCodeId =
       internationalDialingPrefix.first;
-  String captchaKey = '';
-  RxInt smsSendCooldown = 0.obs;
-  int smsSendTimestamp = 0;
+  late String captchaKey = '';
+  late final RxInt smsSendCooldown = 0.obs;
+  late int smsSendTimestamp = 0;
 
   // 定时器
   Timer? qrCodeTimer;
@@ -79,7 +80,7 @@ class LoginPageController extends GetxController
           if (qrCodeLeftTime <= 0) {
             t.cancel();
             statusQRCode.value = '二维码已过期，请刷新';
-            qrCodeLeftTime = 0.obs;
+            qrCodeLeftTime.value = 0;
             return;
           }
 
@@ -94,7 +95,7 @@ class LoginPageController extends GetxController
               Get.back();
             } else if (value['code'] == 86038) {
               t.cancel();
-              qrCodeLeftTime = 0.obs;
+              qrCodeLeftTime.value = 0;
             } else {
               statusQRCode.value = value['msg'];
             }
@@ -290,6 +291,9 @@ class LoginPageController extends GetxController
       }
       if (data['status'] == 2) {
         SmartDialog.showToast(data['message']);
+        if (!Utils.isMobile) {
+          return;
+        }
         // return;
         //{"code":0,"message":"0","ttl":1,"data":{"status":2,"message":"本次登录环境存在风险, 需使用手机号进行验证或绑定","url":"https://passport.bilibili.com/h5-app/passport/risk/verify?tmp_token=9e785433940891dfa78f033fb7928181&request_id=e5a6d6480df04097870be56c6e60f7ef&source=risk","token_info":null,"cookie_info":null,"sso":null,"is_new":false,"is_tourist":false}}
         String url = data['url']!;
@@ -313,6 +317,7 @@ class LoginPageController extends GetxController
           SmartDialog.showToast("当前账号未支持手机号验证，请尝试其它登录方式");
           return;
         }
+
         TextEditingController textFieldController = TextEditingController();
         String captchaKey = '';
         Get.dialog(
@@ -474,7 +479,7 @@ class LoginPageController extends GetxController
               ),
             ],
           ),
-        );
+        ).whenComplete(textFieldController.dispose);
 
         return;
       }
@@ -493,16 +498,14 @@ class LoginPageController extends GetxController
         case 0:
           // login success
           break;
-        case -105:
+        case -105 when (Utils.isMobile):
           String captureUrl = res['data']['url'];
           Uri captureUri = Uri.parse(captureUrl);
           captchaData.token = captureUri.queryParameters['recaptcha_token']!;
           String geeGt = captureUri.queryParameters['gee_gt']!;
           String geeChallenge = captureUri.queryParameters['gee_challenge']!;
 
-          getCaptcha(geeGt, geeChallenge, () {
-            loginByPassword();
-          });
+          getCaptcha(geeGt, geeChallenge, loginByPassword);
           break;
         default:
           SmartDialog.showToast(res['msg']);
@@ -665,9 +668,7 @@ class LoginPageController extends GetxController
             return;
           }
 
-          getCaptcha(geeGt, geeChallenge, () {
-            sendSmsCode();
-          });
+          getCaptcha(geeGt, geeChallenge, sendSmsCode);
           break;
         default:
           SmartDialog.showToast(res['msg']);
@@ -706,62 +707,65 @@ class LoginPageController extends GetxController
     final selectAccount = Map.of(Accounts.accountMode);
     final options = {
       AnonymousAccount(): '0',
-      ...Accounts.account.toMap().cast<String, Account>().map(
-        (k, v) => MapEntry(v, k),
+      ...Accounts.account.toMap().map(
+        (k, v) => MapEntry(v, k as String),
       ),
     };
     return showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('选择账号mid, 为0时使用匿名'),
-            titlePadding: const EdgeInsets.only(left: 22, top: 16, right: 22),
-            contentPadding: const EdgeInsets.symmetric(vertical: 5),
-            actionsPadding: const EdgeInsets.only(
-              left: 16,
-              right: 16,
-              bottom: 10,
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: AccountType.values
-                    .map(
-                      (e) => WrapRadioOptionsGroup<Account>(
+      builder: (context) => AlertDialog(
+        title: const Text('选择账号mid, 为0时使用匿名'),
+        titlePadding: const EdgeInsets.only(left: 22, top: 16, right: 22),
+        contentPadding: const EdgeInsets.symmetric(vertical: 5),
+        actionsPadding: const EdgeInsets.only(
+          left: 16,
+          right: 16,
+          bottom: 10,
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: AccountType.values
+                .map(
+                  (e) => Builder(
+                    builder: (context) => RadioGroup(
+                      groupValue: selectAccount[e],
+                      onChanged: (v) {
+                        selectAccount[e] = v!;
+                        (context as Element).markNeedsBuild();
+                      },
+                      child: WrapRadioOptionsGroup<Account>(
                         groupTitle: e.title,
                         options: options,
-                        selectedValue: selectAccount[e],
-                        onChanged: (v) => setState(() => selectAccount[e] = v!),
                       ),
-                    )
-                    .toList(),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: Get.back,
+            child: Text(
+              '取消',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.outline,
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: Get.back,
-                child: Text(
-                  '取消',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  for (var i in selectAccount.entries) {
-                    if (i.value != Accounts.get(i.key)) {
-                      Accounts.set(i.key, i.value);
-                    }
-                  }
-                  Get.back();
-                },
-                child: const Text('确定'),
-              ),
-            ],
-          );
-        },
+          ),
+          TextButton(
+            onPressed: () {
+              for (var i in selectAccount.entries) {
+                if (i.value != Accounts.get(i.key)) {
+                  Accounts.set(i.key, i.value);
+                }
+              }
+              Get.back();
+            },
+            child: const Text('确定'),
+          ),
+        ],
       ),
     );
   }

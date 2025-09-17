@@ -7,6 +7,7 @@ import 'package:PiliPlus/models_new/space/space/data.dart';
 import 'package:PiliPlus/pages/coin_log/controller.dart';
 import 'package:PiliPlus/pages/exp_log/controller.dart';
 import 'package:PiliPlus/pages/log_table/view.dart';
+import 'package:PiliPlus/pages/login_devices/view.dart';
 import 'package:PiliPlus/pages/login_log/controller.dart';
 import 'package:PiliPlus/pages/member/controller.dart';
 import 'package:PiliPlus/pages/member/widget/user_info_card.dart';
@@ -16,6 +17,7 @@ import 'package:PiliPlus/pages/member_dynamics/view.dart';
 import 'package:PiliPlus/pages/member_favorite/view.dart';
 import 'package:PiliPlus/pages/member_home/view.dart';
 import 'package:PiliPlus/pages/member_pgc/view.dart';
+import 'package:PiliPlus/pages/member_shop/view.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/material.dart';
@@ -47,52 +49,59 @@ class _MemberPageState extends State<MemberPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = Theme.of(context).colorScheme;
+    final padding = MediaQuery.viewPaddingOf(context);
     return Material(
-      color: theme.colorScheme.surface,
-      child: Obx(() {
-        if (_userController.loadingState.value.isSuccess) {
-          return ExtendedNestedScrollView(
-            key: _userController.key,
-            controller: _userController.scrollController,
-            onlyOneScrollInBody: true,
-            pinnedHeaderSliverHeightBuilder: () =>
-                kToolbarHeight + MediaQuery.paddingOf(context).top,
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                _buildUserInfo(
-                  theme,
-                  _userController.loadingState.value,
-                ),
-              ];
-            },
-            body: _userController.tab2?.isNotEmpty == true
-                ? SafeArea(
-                    top: false,
-                    bottom: false,
-                    child: Column(
-                      children: [
-                        if ((_userController.tab2?.length ?? 0) > 1)
-                          TabBar(
-                            controller: _userController.tabController,
-                            tabs: _userController.tabs,
-                            onTap: _userController.onTapTab,
-                          ),
-                        Expanded(child: _buildBody),
-                      ],
-                    ),
-                  )
-                : const Center(child: Text('EMPTY')),
+      color: theme.surface,
+      child: Obx(
+        () {
+          if (_userController.loadingState.value.isSuccess) {
+            return ExtendedNestedScrollView(
+              key: _userController.key,
+              onlyOneScrollInBody: true,
+              pinnedHeaderSliverHeightBuilder: () =>
+                  kToolbarHeight + MediaQuery.viewPaddingOf(context).top,
+              headerSliverBuilder: (context, innerBoxIsScrolled) {
+                return [
+                  _buildUserInfo(theme, _userController.loadingState.value),
+                ];
+              },
+              body: _userController.tab2?.isNotEmpty == true
+                  ? Padding(
+                      padding: EdgeInsets.only(
+                        left: padding.left,
+                        right: padding.right,
+                      ),
+                      child: Column(
+                        children: [
+                          if ((_userController.tab2?.length ?? 0) > 1)
+                            SizedBox(
+                              height: 45,
+                              child: TabBar(
+                                controller: _userController.tabController,
+                                tabs: _userController.tabs,
+                                onTap: _userController.onTapTab,
+                                dividerColor: theme.outline.withValues(
+                                  alpha: 0.2,
+                                ),
+                              ),
+                            ),
+                          Expanded(child: _buildBody),
+                        ],
+                      ),
+                    )
+                  : const Center(child: Text('EMPTY')),
+            );
+          }
+          return Center(
+            child: _buildUserInfo(theme, _userController.loadingState.value),
           );
-        }
-        return Center(
-          child: _buildUserInfo(theme, _userController.loadingState.value),
-        );
-      }),
+        },
+      ),
     );
   }
 
-  List<Widget> _actions(ThemeData theme) => [
+  List<Widget> _actions(ColorScheme theme) => [
     IconButton(
       tooltip: '搜索',
       onPressed: () => Get.toNamed(
@@ -196,6 +205,17 @@ class _MemberPageState extends State<MemberPage> {
                 ),
               ),
             PopupMenuItem(
+              onTap: () => Get.to(const LoginDevicesPage()),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.devices, size: 18),
+                  SizedBox(width: 10),
+                  Text('登录设备'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
               onTap: () => Get.to(
                 const LogPage(),
                 arguments: LoginLogController(),
@@ -251,19 +271,10 @@ class _MemberPageState extends State<MemberPage> {
           ] else ...[
             const PopupMenuDivider(),
             PopupMenuItem(
-              onTap: () => showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  clipBehavior: Clip.hardEdge,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                  content: MemberReportPanel(
-                    name: _userController.username,
-                    mid: _mid,
-                  ),
-                ),
+              onTap: () => showMemberReportDialog(
+                context,
+                name: _userController.username,
+                mid: _mid,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -271,12 +282,12 @@ class _MemberPageState extends State<MemberPage> {
                   Icon(
                     Icons.error_outline,
                     size: 19,
-                    color: theme.colorScheme.error,
+                    color: theme.error,
                   ),
                   const SizedBox(width: 10),
                   Text(
                     '举报',
-                    style: TextStyle(color: theme.colorScheme.error),
+                    style: TextStyle(color: theme.error),
                   ),
                 ],
               ),
@@ -312,12 +323,19 @@ class _MemberPageState extends State<MemberPage> {
           heroTag: _heroTag,
           mid: _mid,
         ),
+        'shop' => MemberShop(
+          heroTag: _heroTag,
+          mid: _mid,
+        ),
         _ => Center(child: Text(item.title ?? '')),
       };
     }).toList(),
   );
 
-  Widget _buildUserInfo(ThemeData theme, LoadingState<SpaceData?> userState) {
+  Widget _buildUserInfo(
+    ColorScheme theme,
+    LoadingState<SpaceData?> userState,
+  ) {
     switch (userState) {
       case Loading():
         return const CircularProgressIndicator();

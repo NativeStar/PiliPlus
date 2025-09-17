@@ -1,5 +1,4 @@
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
-import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/space/space_cheese/item.dart';
@@ -24,7 +23,7 @@ class MemberCheese extends StatefulWidget {
 }
 
 class _MemberCheeseState extends State<MemberCheese>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, GridMixin {
   late final _controller = Get.put(
     MemberCheeseController(widget.mid),
     tag: widget.heroTag,
@@ -41,7 +40,7 @@ class _MemberCheeseState extends State<MemberCheese>
           SliverPadding(
             padding: EdgeInsets.only(
               top: 7,
-              bottom: MediaQuery.paddingOf(context).bottom + 80,
+              bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
             ),
             sliver: Obx(() => _buildBody(_controller.loadingState.value)),
           ),
@@ -55,20 +54,18 @@ class _MemberCheeseState extends State<MemberCheese>
 
   Widget _buildBody(LoadingState<List<SpaceCheeseItem>?> loadingState) {
     return switch (loadingState) {
-      Loading() => linearLoading,
+      Loading() => gridSkeleton,
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: Grid.videoCardHDelegate(context),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == response.length - 1) {
-                      _controller.onLoadMore();
-                    }
-                    return MemberCheeseItem(item: response[index]);
-                  },
-                  childCount: response!.length,
-                ),
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    _controller.onLoadMore();
+                  }
+                  return MemberCheeseItem(item: response[index]);
+                },
+                itemCount: response!.length,
               )
             : HttpError(onReload: _controller.onReload),
       Error(:var errMsg) => HttpError(

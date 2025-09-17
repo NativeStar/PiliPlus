@@ -1,4 +1,3 @@
-import 'package:PiliPlus/common/skeleton/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
@@ -8,7 +7,7 @@ import 'package:PiliPlus/models_new/sub/sub_detail/media.dart';
 import 'package:PiliPlus/pages/subscription_detail/controller.dart';
 import 'package:PiliPlus/pages/subscription_detail/widget/sub_video_card.dart';
 import 'package:PiliPlus/utils/grid.dart';
-import 'package:PiliPlus/utils/num_util.dart';
+import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -35,7 +34,7 @@ class SubDetailPage extends StatefulWidget {
   }
 }
 
-class _SubDetailPageState extends State<SubDetailPage> {
+class _SubDetailPageState extends State<SubDetailPage> with GridMixin {
   late final SubDetailController _subDetailController = Get.put(
     SubDetailController(),
     tag: Utils.makeHeroTag(Get.parameters['id']),
@@ -44,29 +43,28 @@ class _SubDetailPageState extends State<SubDetailPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final padding = MediaQuery.paddingOf(context);
-    return Scaffold(
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: refreshIndicator(
-          onRefresh: _subDetailController.onRefresh,
-          child: CustomScrollView(
-            controller: _subDetailController.scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              _appBar(theme, padding),
-              SliverPadding(
-                padding: EdgeInsets.only(
-                  top: 7,
-                  bottom: padding.bottom + 80,
-                ),
-                sliver: Obx(
-                  () => _buildBody(_subDetailController.loadingState.value),
-                ),
+    final padding = MediaQuery.viewPaddingOf(context);
+    return Material(
+      color: theme.colorScheme.surface,
+      child: refreshIndicator(
+        onRefresh: _subDetailController.onRefresh,
+        child: CustomScrollView(
+          controller: _subDetailController.scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            _appBar(theme, padding),
+            SliverPadding(
+              padding: EdgeInsets.only(
+                top: 7,
+                left: padding.left,
+                right: padding.right,
+                bottom: padding.bottom + 100,
               ),
-            ],
-          ),
+              sliver: Obx(
+                () => _buildBody(_subDetailController.loadingState.value),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -74,32 +72,22 @@ class _SubDetailPageState extends State<SubDetailPage> {
 
   Widget _buildBody(LoadingState<List<SubDetailItemModel>?> loadingState) {
     return switch (loadingState) {
-      Loading() => SliverGrid(
-        gridDelegate: Grid.videoCardHDelegate(context),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) => const VideoCardHSkeleton(),
-          childCount: 10,
-        ),
-      ),
+      Loading() => gridSkeleton,
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: Grid.videoCardHDelegate(context),
-                delegate: SliverChildBuilderDelegate(
-                  childCount: response!.length,
-                  (context, index) {
-                    if (index == response.length - 1) {
-                      _subDetailController.onLoadMore();
-                    }
-                    return SubVideoCardH(
-                      videoItem: response[index],
-                    );
-                  },
-                ),
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    _subDetailController.onLoadMore();
+                  }
+                  return SubVideoCardH(
+                    videoItem: response[index],
+                  );
+                },
+                itemCount: response!.length,
               )
-            : HttpError(
-                onReload: _subDetailController.onReload,
-              ),
+            : HttpError(onReload: _subDetailController.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: _subDetailController.onReload,
@@ -124,6 +112,7 @@ class _SubDetailPageState extends State<SubDetailPage> {
 
   Widget _buildAppBar(ThemeData theme, EdgeInsets padding, SubItemModel info) {
     final style = TextStyle(
+      height: 1,
       fontSize: 12.5,
       color: theme.colorScheme.outline,
     );
@@ -167,7 +156,7 @@ class _SubDetailPageState extends State<SubDetailPage> {
           ),
           padding: EdgeInsets.only(
             top: kToolbarHeight + padding.top + 10,
-            left: 12,
+            left: 12 + padding.left,
             right: 12,
             bottom: 12,
           ),
@@ -178,31 +167,32 @@ class _SubDetailPageState extends State<SubDetailPage> {
               cover,
               Expanded(
                 child: Column(
-                  spacing: 4,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      info.title!,
-                      style: TextStyle(
-                        fontSize: theme.textTheme.titleMedium!.fontSize,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        info.title!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     GestureDetector(
-                      onTap: () {
-                        Get.toNamed(
-                          '/member?mid=${info.upper!.mid}',
-                        );
-                      },
+                      onTap: () =>
+                          Get.toNamed('/member?mid=${info.upper!.mid}'),
                       child: Text(
                         info.upper!.name!,
                         style: TextStyle(color: theme.colorScheme.primary),
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 4),
                     Text('共${info.mediaCount}条视频', style: style),
+                    const SizedBox(height: 4),
                     Text(
-                      '${NumUtil.numFormat(info.viewCount ?? info.cntInfo?.play)}次播放',
+                      '${NumUtils.numFormat(info.viewCount ?? info.cntInfo?.play)}次播放',
                       style: style,
                     ),
                   ],

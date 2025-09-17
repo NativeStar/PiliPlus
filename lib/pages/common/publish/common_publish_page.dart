@@ -2,17 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' show max;
 
-import 'package:PiliPlus/http/msg.dart';
 import 'package:PiliPlus/models/common/publish_panel_type.dart';
-import 'package:PiliPlus/models_new/upload_bfs/data.dart';
 import 'package:PiliPlus/utils/context_ext.dart';
-import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:chat_bottom_container/chat_bottom_container.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
-import 'package:image_picker/image_picker.dart';
 
 abstract class CommonPublishPage<T> extends StatefulWidget {
   const CommonPublishPage({
@@ -40,11 +34,7 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
   late final RxBool readOnly = false.obs;
   late final RxBool enablePublish = false.obs;
 
-  late final imagePicker = ImagePicker();
-  late final RxList<String> pathList = <String>[].obs;
-  int get limit => widget.imageLengthLimit ?? 9;
-
-  bool? hasPub;
+  bool hasPub = false;
   void initPubState();
 
   @override
@@ -67,7 +57,7 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
 
   @override
   void dispose() {
-    if (hasPub != true) {
+    if (!hasPub) {
       onSave();
     }
     focusNode.dispose();
@@ -87,7 +77,8 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
     if (state == AppLifecycleState.resumed) {
       if (mounted &&
           widget.autofocus &&
-          panelType.value == PanelType.keyboard) {
+          (panelType.value == PanelType.keyboard ||
+              panelType.value == PanelType.none)) {
         controller.restoreChatPanel();
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (focusNode.hasFocus) {
@@ -108,8 +99,6 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
 
   void updatePanelType(PanelType type) {
     final isSwitchToKeyboard = PanelType.keyboard == type;
-    final isSwitchToEmojiPanel =
-        PanelType.emoji == type || PanelType.more == type;
     bool isUpdated = false;
     switch (type) {
       case PanelType.keyboard:
@@ -128,9 +117,9 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
             ? ChatBottomPanelType.keyboard
             : ChatBottomPanelType.other,
         data: type,
-        forceHandleFocus: isSwitchToEmojiPanel
+        forceHandleFocus: isSwitchToKeyboard
             ? ChatBottomHandleFocus.requestFocus
-            : ChatBottomHandleFocus.none,
+            : ChatBottomHandleFocus.unfocus,
       );
     }
 
@@ -211,42 +200,7 @@ abstract class CommonPublishPageState<T extends CommonPublishPage>
     );
   }
 
-  Future<void> onPublish() async {
-    feedBack();
-    List<Map<String, dynamic>>? pictures;
-    if (pathList.isNotEmpty) {
-      SmartDialog.showLoading(msg: '正在上传图片...');
-      final cancelToken = CancelToken();
-      try {
-        pictures = await Future.wait<Map<String, dynamic>>(
-          pathList.map((path) async {
-            Map result = await MsgHttp.uploadBfs(
-              path: path,
-              category: 'daily',
-              biz: 'new_dyn',
-              cancelToken: cancelToken,
-            );
-            if (!result['status']) throw HttpException(result['msg']);
-            UploadBfsResData data = result['data'];
-            return {
-              'img_width': data.imageWidth,
-              'img_height': data.imageHeight,
-              'img_size': data.imgSize,
-              'img_src': data.imageUrl,
-            };
-          }),
-          eagerError: true,
-        );
-        SmartDialog.dismiss();
-      } on HttpException catch (e) {
-        cancelToken.cancel();
-        SmartDialog.dismiss();
-        SmartDialog.showToast(e.message);
-        return;
-      }
-    }
-    onCustomPublish(pictures: pictures);
-  }
+  Future<void> onPublish();
 
   Future<void> onCustomPublish({List? pictures});
 

@@ -54,13 +54,12 @@ class SearchArticleController
       builder: (context) {
         final theme = Theme.of(context);
         return SingleChildScrollView(
-          child: Container(
-            width: double.infinity,
+          child: Padding(
             padding: EdgeInsets.only(
               top: 20,
               left: 16,
               right: 16,
-              bottom: 80 + MediaQuery.paddingOf(context).bottom,
+              bottom: 100 + MediaQuery.viewPaddingOf(context).bottom,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

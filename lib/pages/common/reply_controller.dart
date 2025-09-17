@@ -7,11 +7,11 @@ import 'package:PiliPlus/http/reply.dart';
 import 'package:PiliPlus/models/common/reply/reply_sort_type.dart';
 import 'package:PiliPlus/pages/common/common_list_controller.dart';
 import 'package:PiliPlus/pages/video/reply_new/view.dart';
-import 'package:PiliPlus/services/account_service.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/reply_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
@@ -20,14 +20,12 @@ import 'package:get/get.dart';
 import 'package:get/get_navigation/src/dialog/dialog_route.dart';
 
 abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
-  RxInt count = (-1).obs;
+  final RxInt count = (-1).obs;
 
-  late Rx<ReplySortType> sortType;
-  late Rx<Mode> mode;
+  late final Rx<ReplySortType> sortType;
+  late final Rx<Mode> mode;
 
-  late final savedReplies = <Object, List<RichTextItem>?>{};
-
-  AccountService accountService = Get.find<AccountService>();
+  final savedReplies = <Object, List<RichTextItem>?>{};
 
   Int64? upMid;
   Int64? cursorNext;
@@ -130,8 +128,9 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
     int? replyType,
   }) {
     if (loadingState.value case Error error) {
-      if (error.errMsg?.contains('关闭评论区') == true) {
-        SmartDialog.showToast(error.errMsg!);
+      final errMsg = error.errMsg;
+      if (errMsg != null && (error.code == 12061 || error.code == 12002)) {
+        SmartDialog.showToast(errMsg);
         return;
       }
     }
@@ -167,21 +166,20 @@ abstract class ReplyController<R> extends CommonListController<R, ReplyInfo> {
             },
             transitionDuration: const Duration(milliseconds: 500),
             transitionBuilder: (context, animation, secondaryAnimation, child) {
-              const begin = Offset(0.0, 1.0);
-              const end = Offset.zero;
-              const curve = Curves.linear;
-
-              var tween = Tween(
-                begin: begin,
-                end: end,
-              ).chain(CurveTween(curve: curve));
-
               return SlideTransition(
-                position: animation.drive(tween),
+                position: animation.drive(
+                  Tween(
+                    begin: const Offset(0.0, 1.0),
+                    end: Offset.zero,
+                  ).chain(CurveTween(curve: Curves.linear)),
+                ),
                 child: child,
               );
             },
-            settings: RouteSettings(arguments: Get.arguments),
+            settings: RouteSettings(
+              arguments: Get.arguments,
+              name: '${Get.currentRoute}-copy-${Utils.generateRandomString(3)}',
+            ),
           ),
         )
         .then(

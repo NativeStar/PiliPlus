@@ -1,7 +1,7 @@
-import 'package:PiliPlus/common/skeleton/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/video_card/video_card_h.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/home_tab_type.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
@@ -10,12 +10,12 @@ import 'package:PiliPlus/pages/home/controller.dart';
 import 'package:PiliPlus/pages/hot/controller.dart';
 import 'package:PiliPlus/pages/rank/view.dart';
 import 'package:PiliPlus/utils/grid.dart';
-import 'package:PiliPlus/utils/image_util.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-class HotPage extends CommonPage {
+class HotPage extends StatefulWidget {
   const HotPage({super.key});
 
   @override
@@ -23,7 +23,7 @@ class HotPage extends CommonPage {
 }
 
 class _HotPageState extends CommonPageState<HotPage, HotController>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, GridMixin {
   @override
   HotController controller = Get.put(HotController());
 
@@ -44,7 +44,7 @@ class _HotPageState extends CommonPageState<HotPage, HotController>
           CachedNetworkImage(
             width: 35,
             height: 35,
-            imageUrl: ImageUtil.thumbnailUrl(iconUrl),
+            imageUrl: ImageUtils.thumbnailUrl(iconUrl),
           ),
           const SizedBox(height: 4),
           Text(
@@ -93,10 +93,9 @@ class _HotPageState extends CommonPageState<HotPage, HotController>
                                 } else {
                                   Get.to(
                                     Scaffold(
+                                      resizeToAvoidBottomInset: false,
                                       appBar: AppBar(title: const Text('排行榜')),
-                                      body: const SafeArea(
-                                        top: false,
-                                        bottom: false,
+                                      body: const ViewSafeArea(
                                         child: RankPage(),
                                       ),
                                     ),
@@ -136,10 +135,7 @@ class _HotPageState extends CommonPageState<HotPage, HotController>
             ),
           ),
           SliverPadding(
-            padding: EdgeInsets.only(
-              top: 7,
-              bottom: MediaQuery.paddingOf(context).bottom + 80,
-            ),
+            padding: const EdgeInsets.only(top: 7, bottom: 100),
             sliver: Obx(
               () => _buildBody(controller.loadingState.value),
             ),
@@ -149,43 +145,27 @@ class _HotPageState extends CommonPageState<HotPage, HotController>
     );
   }
 
-  Widget _buildSkeleton() {
-    return SliverGrid(
-      gridDelegate: Grid.videoCardHDelegate(context),
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          return const VideoCardHSkeleton();
-        },
-        childCount: 10,
-      ),
-    );
-  }
-
   Widget _buildBody(LoadingState<List<HotVideoItemModel>?> loadingState) {
     return switch (loadingState) {
-      Loading() => _buildSkeleton(),
+      Loading() => gridSkeleton,
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: Grid.videoCardHDelegate(context),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == response.length - 1) {
-                      controller.onLoadMore();
-                    }
-                    return VideoCardH(
-                      videoItem: response[index],
-                      onRemove: () => controller.loadingState
-                        ..value.data!.removeAt(index)
-                        ..refresh(),
-                    );
-                  },
-                  childCount: response!.length,
-                ),
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    controller.onLoadMore();
+                  }
+                  return VideoCardH(
+                    videoItem: response[index],
+                    onRemove: () => controller.loadingState
+                      ..value.data!.removeAt(index)
+                      ..refresh(),
+                  );
+                },
+                itemCount: response!.length,
               )
-            : HttpError(
-                onReload: controller.onReload,
-              ),
+            : HttpError(onReload: controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: controller.onReload,

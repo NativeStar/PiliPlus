@@ -174,14 +174,6 @@ List<SettingsModel> get styleSettings => [
   ),
   const SettingsModel(
     settingsType: SettingsType.sw1tch,
-    title: '播放页移除安全边距',
-    subtitle: '隐藏状态栏、撑满屏幕，但播放控件仍处于安全域内',
-    leading: Icon(Icons.fit_screen_outlined),
-    setKey: SettingBoxKey.videoPlayerRemoveSafeArea,
-    defaultVal: false,
-  ),
-  const SettingsModel(
-    settingsType: SettingsType.sw1tch,
     title: '动态页启用瀑布流',
     subtitle: '关闭会显示为单列',
     leading: Icon(Icons.view_array_outlined),
@@ -457,7 +449,6 @@ List<SettingsModel> get styleSettings => [
           contentPadding: const EdgeInsets.symmetric(vertical: 16),
           title: const Text('Color Picker'),
           content: SlideColorPicker(
-            showResetBtn: false,
             color: reduceLuxColor ?? Colors.white,
             callback: (Color? color) {
               if (color != null && color != reduceLuxColor) {
@@ -575,7 +566,7 @@ List<SettingsModel> get styleSettings => [
     setKey: SettingBoxKey.isPureBlackTheme,
     defaultVal: false,
     onChanged: (value) {
-      if (Get.theme.brightness == Brightness.dark || Pref.darkVideoPage) {
+      if (Get.isDarkMode || Pref.darkVideoPage) {
         Get.forceAppUpdate();
       }
     },
@@ -586,7 +577,7 @@ List<SettingsModel> get styleSettings => [
     leading: const Icon(Icons.color_lens_outlined),
     title: '应用主题',
     getSubtitle: () =>
-        '当前主题：${Get.put(ColorSelectController()).type.value == 0 ? '动态取色' : '指定颜色'}',
+        '当前主题：${Get.put(ColorSelectController()).dynamicColor.value ? '动态取色' : '指定颜色'}',
   ),
   SettingsModel(
     settingsType: SettingsType.normal,

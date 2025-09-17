@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' show max;
 
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/grpc/dyn.dart';
 import 'package:PiliPlus/http/msg.dart';
 import 'package:PiliPlus/models/common/dynamic/dynamic_badge_mode.dart';
@@ -12,6 +13,7 @@ import 'package:PiliPlus/pages/dynamics/controller.dart';
 import 'package:PiliPlus/pages/home/controller.dart';
 import 'package:PiliPlus/pages/mine/view.dart';
 import 'package:PiliPlus/services/account_service.dart';
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -56,6 +58,7 @@ class MainController extends GetxController
   late final optTabletNav = Pref.optTabletNav;
 
   late bool directExitOnBack = Pref.directExitOnBack;
+  late bool minimizeOnExit = Pref.minimizeOnExit;
 
   static const _period = 5 * 60 * 1000;
   late int _lastSelectTime = 0;
@@ -207,7 +210,7 @@ class MainController extends GetxController
 
   void setNavBarConfig() {
     List<int>? navBarSort =
-        (GStorage.setting.get(SettingBoxKey.navBarSort) as List?)?.cast();
+        (GStorage.setting.get(SettingBoxKey.navBarSort) as List?)?.fromCast();
     int defaultHomePage = Pref.defaultHomePage;
     late final List<NavigationBarType> navigationBars;
     if (navBarSort == null || navBarSort.isEmpty) {
@@ -263,8 +266,8 @@ class MainController extends GetxController
     } else {
       Get.to(
         const Material(
-          child: SafeArea(
-            bottom: false,
+          child: ViewSafeArea(
+            top: true,
             child: MinePage(),
           ),
         ),

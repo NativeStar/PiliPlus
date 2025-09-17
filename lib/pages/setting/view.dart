@@ -1,3 +1,5 @@
+import 'package:PiliPlus/common/widgets/list_tile.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/http/login.dart';
 import 'package:PiliPlus/models/common/setting_type.dart';
 import 'package:PiliPlus/pages/about/view.dart';
@@ -12,9 +14,8 @@ import 'package:PiliPlus/pages/setting/widgets/multi_select_dialog.dart';
 import 'package:PiliPlus/pages/webdav/view.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/accounts/account.dart';
-import 'package:PiliPlus/utils/context_ext.dart';
 import 'package:PiliPlus/utils/extension.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ListTile;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -87,35 +88,28 @@ class _SettingPageState extends State<SettingPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    _isPortrait = context.isPortrait;
+    _isPortrait = MediaQuery.sizeOf(context).isPortrait;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: _isPortrait ? const Text('设置') : Text(_type.title),
       ),
-      body: _isPortrait
-          ? _buildList(theme)
-          : Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 4,
-                  child: MediaQuery.removePadding(
-                    context: context,
-                    removeRight: true,
-                    removeTop: true,
+      body: ViewSafeArea(
+        child: _isPortrait
+            ? _buildList(theme)
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 4,
                     child: _buildList(theme),
                   ),
-                ),
-                VerticalDivider(
-                  width: 1,
-                  color: theme.colorScheme.outline.withValues(alpha: 0.1),
-                ),
-                Expanded(
-                  flex: 6,
-                  child: MediaQuery.removePadding(
-                    context: context,
-                    removeLeft: true,
-                    removeTop: true,
+                  VerticalDivider(
+                    width: 1,
+                    color: theme.colorScheme.outline.withValues(alpha: 0.1),
+                  ),
+                  Expanded(
+                    flex: 6,
                     child: switch (_type) {
                       SettingType.privacySetting => const PrivacySetting(
                         showAppBar: false,
@@ -141,9 +135,9 @@ class _SettingPageState extends State<SettingPage> {
                       SettingType.about => const AboutPage(showAppBar: false),
                     },
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+      ),
     );
   }
 
@@ -171,14 +165,15 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   Widget _buildList(ThemeData theme) {
+    final padding = MediaQuery.viewPaddingOf(context);
     TextStyle titleStyle = theme.textTheme.titleMedium!;
     TextStyle subTitleStyle = theme.textTheme.labelMedium!.copyWith(
       color: theme.colorScheme.outline,
     );
-    final padding = MediaQuery.paddingOf(context);
     return ListView(
+      padding: EdgeInsets.only(bottom: padding.bottom + 100),
       children: [
-        _buildSearchItem(theme, padding),
+        _buildSearchItem(theme),
         ..._items
             .sublist(0, _items.length - 1)
             .map(
@@ -212,7 +207,6 @@ class _SettingPageState extends State<SettingPage> {
           leading: Icon(_items.last.icon),
           title: Text(_items.last.type.title, style: titleStyle),
         ),
-        SizedBox(height: padding.bottom + 80),
       ],
     );
   }
@@ -284,9 +278,9 @@ class _SettingPageState extends State<SettingPage> {
     );
   }
 
-  Widget _buildSearchItem(ThemeData theme, EdgeInsets padding) => Padding(
-    padding: EdgeInsets.only(
-      left: 16 + padding.left,
+  Widget _buildSearchItem(ThemeData theme) => Padding(
+    padding: const EdgeInsets.only(
+      left: 16,
       right: 16,
       bottom: 8,
     ),

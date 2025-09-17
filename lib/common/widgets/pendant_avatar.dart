@@ -2,7 +2,7 @@ import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/models/common/avatar_badge_type.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/utils/extension.dart';
-import 'package:PiliPlus/utils/image_util.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -22,13 +22,13 @@ class PendantAvatar extends StatelessWidget {
     required this.avatar,
     this.size = 80,
     double? badgeSize,
-    bool? isVip,
+    bool isVip = false,
     int? officialType,
     this.garbPendantImage,
     this.roomId,
     this.onTap,
   }) : _badgeType = officialType == null || officialType < 0
-           ? isVip == true
+           ? isVip
                  ? BadgeType.vip
                  : BadgeType.none
            : officialType == 0
@@ -43,16 +43,17 @@ class PendantAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isMemberAvatar = size == 80;
     return Stack(
       alignment: Alignment.bottomCenter,
       clipBehavior: Clip.none,
       children: [
         onTap == null
-            ? _buildAvatar(colorScheme)
+            ? _buildAvatar(colorScheme, isMemberAvatar)
             : GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: onTap,
-                child: _buildAvatar(colorScheme),
+                child: _buildAvatar(colorScheme, isMemberAvatar),
               ),
         if (showDynDecorate && !garbPendantImage.isNullOrEmpty)
           Positioned(
@@ -63,7 +64,7 @@ class PendantAvatar extends StatelessWidget {
               child: CachedNetworkImage(
                 width: size * 1.75,
                 height: size * 1.75,
-                imageUrl: ImageUtil.thumbnailUrl(garbPendantImage),
+                imageUrl: ImageUtils.thumbnailUrl(garbPendantImage),
               ),
             ),
           ),
@@ -100,12 +101,13 @@ class PendantAvatar extends StatelessWidget {
             ),
           )
         else if (_badgeType != BadgeType.none)
-          _buildBadge(colorScheme),
+          _buildBadge(colorScheme, isMemberAvatar),
       ],
     );
   }
 
-  Widget _buildAvatar(ColorScheme colorScheme) => size == 80
+  Widget _buildAvatar(ColorScheme colorScheme, bool isMemberAvatar) =>
+      isMemberAvatar
       ? DecoratedBox(
           decoration: BoxDecoration(
             border: Border.all(
@@ -131,7 +133,7 @@ class PendantAvatar extends StatelessWidget {
           type: ImageType.avatar,
         );
 
-  Widget _buildBadge(ColorScheme colorScheme) {
+  Widget _buildBadge(ColorScheme colorScheme, bool isMemberAvatar) {
     final child = switch (_badgeType) {
       BadgeType.vip => Image.asset(
         'assets/images/big-vip.png',
@@ -145,9 +147,10 @@ class PendantAvatar extends StatelessWidget {
         semanticLabel: _badgeType.desc,
       ),
     };
+    final offset = isMemberAvatar ? 2.0 : 0.0;
     return Positioned(
-      right: 0,
-      bottom: 0,
+      right: offset,
+      bottom: offset,
       child: IgnorePointer(
         child: DecoratedBox(
           decoration: BoxDecoration(

@@ -5,6 +5,7 @@ import 'package:PiliPlus/models/common/dynamic/dynamics_type.dart';
 import 'package:PiliPlus/models/dynamics/article_content_model.dart';
 import 'package:PiliPlus/models/model_avatar.dart';
 import 'package:PiliPlus/models_new/live/live_feed_index/watched_show.dart';
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 
 class DynamicsDataModel {
@@ -12,6 +13,26 @@ class DynamicsDataModel {
   List<DynamicItemModel>? items;
   String? offset;
   int? total;
+
+  static String _getMatchText(DynamicItemModel item) {
+    final moduleDynamic = item.modules.moduleDynamic;
+    final opus = moduleDynamic?.major?.opus;
+    return (opus?.title ?? '') +
+        (opus?.summary?.text ?? '') +
+        (moduleDynamic?.desc?.text ?? '') +
+        _getArcTitle(moduleDynamic?.major);
+  }
+
+  static String _getArcTitle(DynamicMajorModel? major) {
+    final title = switch (major?.type) {
+      'MAJOR_TYPE_ARCHIVE' => major?.archive?.title,
+      'MAJOR_TYPE_UGC_SEASON' => major?.ugcSeason?.title,
+      'MAJOR_TYPE_PGC' => major?.pgc?.title,
+      'MAJOR_TYPE_COURSES' => major?.courses?.title,
+      _ => null,
+    };
+    return title ?? '';
+  }
 
   static RegExp banWordForDyn = RegExp(
     Pref.banWordForDyn,
@@ -42,16 +63,15 @@ class DynamicsDataModel {
                     'ADDITIONAL_TYPE_GOODS')) {
           continue;
         }
-        if (enableFilter &&
-            banWordForDyn.hasMatch(
-              (item.orig?.modules.moduleDynamic?.major?.opus?.summary?.text ??
-                      '') +
-                  (item.modules.moduleDynamic?.major?.opus?.summary?.text ??
-                      '') +
-                  (item.orig?.modules.moduleDynamic?.desc?.text ?? '') +
-                  (item.modules.moduleDynamic?.desc?.text ?? ''),
-            )) {
-          continue;
+        if (enableFilter) {
+          if (item.orig case final orig?) {
+            if (banWordForDyn.hasMatch(_getMatchText(orig))) {
+              continue;
+            }
+          }
+          if (banWordForDyn.hasMatch(_getMatchText(item))) {
+            continue;
+          }
         }
         if (filterBan &&
             tempBannedList!.contains(item.modules.moduleAuthor?.mid)) {
@@ -99,7 +119,7 @@ class DynamicItemModel {
     idStr = json['item']?['id_str'];
     // type = json['type']; // int
     if (json['item']?['modules'] case List list) {
-      modules = ItemModulesModel.fromOpusJson(list.cast());
+      modules = ItemModulesModel.fromOpusJson(list);
     } else {
       modules = ItemModulesModel();
     }
@@ -143,6 +163,7 @@ class ItemModulesModel {
   List<ModuleTag>? moduleExtend; // opus的tag
   List<ArticleContentModel>? moduleContent;
   ModuleBlocked? moduleBlocked;
+  ModuleFold? moduleFold;
 
   // moduleBottom
 
@@ -160,10 +181,13 @@ class ItemModulesModel {
     moduleTag = json['module_tag'] != null
         ? ModuleTag.fromJson(json['module_tag'])
         : null;
+    moduleFold = json['module_fold'] != null
+        ? ModuleFold.fromJson(json['module_fold'])
+        : null;
   }
 
-  ItemModulesModel.fromOpusJson(List<Map<String, dynamic>> json) {
-    for (var i in json) {
+  ItemModulesModel.fromOpusJson(List json) {
+    for (Map<String, dynamic> i in json) {
       switch (i['module_type']) {
         case 'MODULE_TYPE_TOP':
           moduleTop = i['module_top'] == null
@@ -211,6 +235,18 @@ class ItemModulesModel {
         // if (kDebugMode) debugPrint('unknown type: ${i}');
       }
     }
+  }
+}
+
+class ModuleFold {
+  List<String>? ids;
+  String? statement;
+  int? type;
+
+  ModuleFold.fromJson(Map<String, dynamic> json) {
+    ids = (json['ids'] as List?)?.fromCast();
+    statement = json['statement'];
+    type = json['type'];
   }
 }
 
@@ -946,7 +982,7 @@ class DynamicMajorModel {
   // MAJOR_TYPE_ARCHIVE 视频
   // MAJOR_TYPE_OPUS 图文/文章
   String? type;
-  Map? courses;
+  DynamicArchiveModel? courses;
   Common? common;
   Map? music;
   ModuleBlocked? blocked;
@@ -980,7 +1016,9 @@ class DynamicMajorModel {
         ? DynamicNoneModel.fromJson(json['none'])
         : null;
     type = json['type'];
-    courses = json['courses'];
+    courses = json['courses'] == null
+        ? null
+        : DynamicArchiveModel.fromJson(json['courses']);
     common = json['common'] == null ? null : Common.fromJson(json['common']);
     music = json['music'];
     blocked = json['blocked'] == null
@@ -1148,6 +1186,7 @@ class DynamicTopicModel {
 
 class DynamicArchiveModel {
   DynamicArchiveModel({
+    this.id,
     this.aid,
     this.badge,
     this.bvid,
@@ -1163,6 +1202,7 @@ class DynamicArchiveModel {
     this.seasonId,
   });
 
+  int? id;
   int? aid;
   Badge? badge;
   String? bvid;
@@ -1178,6 +1218,7 @@ class DynamicArchiveModel {
   int? seasonId;
 
   DynamicArchiveModel.fromJson(Map<String, dynamic> json) {
+    id = json['id'];
     aid = json['aid'] is String ? int.parse(json['aid']) : json['aid'];
     badge = json['badge'] == null ? null : Badge.fromJson(json['badge']);
     bvid = json['bvid'] ?? json['epid'].toString() ?? ' ';
@@ -1442,7 +1483,7 @@ class DynamicLive2Model {
     descSecond = json['desc_second'];
     id = json['id'];
     jumpUrl = json['jump_url'];
-    liveState = json['liv_state'];
+    liveState = json['live_state'];
     reserveType = json['reserve_type'];
     title = json['title'];
   }

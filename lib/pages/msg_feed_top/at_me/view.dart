@@ -11,7 +11,7 @@ import 'package:PiliPlus/models_new/msg/msg_at/item.dart';
 import 'package:PiliPlus/pages/msg_feed_top/at_me/controller.dart';
 import 'package:PiliPlus/pages/whisper_settings/view.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
-import 'package:PiliPlus/utils/date_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -29,6 +29,7 @@ class _AtMePageState extends State<AtMePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: const Text('@我的'),
         actions: [
@@ -54,7 +55,7 @@ class _AtMePageState extends State<AtMePage> {
           slivers: [
             SliverPadding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.paddingOf(context).bottom + 80,
+                bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
               ),
               sliver: Obx(
                 () => _buildBody(theme, _atMeController.loadingState.value),
@@ -79,9 +80,7 @@ class _AtMePageState extends State<AtMePage> {
     return switch (loadingState) {
       Loading() => SliverList.builder(
         itemCount: 12,
-        itemBuilder: (context, index) {
-          return const MsgFeedTopSkeleton();
-        },
+        itemBuilder: (context, index) => const MsgFeedTopSkeleton(),
       ),
       Success(:var response) =>
         response?.isNotEmpty == true
@@ -150,7 +149,7 @@ class _AtMePageState extends State<AtMePage> {
                         ],
                         const SizedBox(height: 4),
                         Text(
-                          DateUtil.dateFormat(item.atTime),
+                          DateFormatUtils.dateFormat(item.atTime),
                           style: theme.textTheme.bodyMedium!.copyWith(
                             fontSize: 13,
                             color: theme.colorScheme.outline,

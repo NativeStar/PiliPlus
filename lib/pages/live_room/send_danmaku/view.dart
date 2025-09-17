@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:PiliPlus/common/widgets/text_field/text_field.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/models/common/publish_panel_type.dart';
 import 'package:PiliPlus/pages/common/publish/common_rich_text_pub_page.dart';
@@ -49,24 +50,20 @@ class _ReplyPageState extends CommonRichTextPubPageState<LiveSendDmPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SafeArea(
-      bottom: false,
+    return ViewSafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
           constraints: const BoxConstraints(maxWidth: 640),
           decoration: BoxDecoration(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(12),
-              topRight: Radius.circular(12),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             color: theme.colorScheme.surface,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ...buildInputView(theme),
-              buildPanelContainer(theme, Colors.transparent),
+              Flexible(child: buildPanelContainer(theme, Colors.transparent)),
             ],
           ),
         ),

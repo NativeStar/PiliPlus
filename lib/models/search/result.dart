@@ -1,6 +1,7 @@
+import 'package:PiliPlus/models/model_avatar.dart';
 import 'package:PiliPlus/models/model_owner.dart';
 import 'package:PiliPlus/models/model_video.dart';
-import 'package:PiliPlus/utils/duration_util.dart';
+import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/em.dart';
 import 'package:PiliPlus/utils/extension.dart';
 
@@ -57,8 +58,7 @@ class SearchVideoData extends SearchNumData<SearchVideoItemModel> {
   SearchVideoData.fromJson(Map<String, dynamic> json) {
     numResults = (json['numResults'] as num?)?.toInt();
     list = (json['result'] as List?)
-        ?.where((e) => e['available'] == true)
-        .map<SearchVideoItemModel>((e) => SearchVideoItemModel.fromJson(e))
+        ?.map<SearchVideoItemModel>((e) => SearchVideoItemModel.fromJson(e))
         .toList();
   }
 }
@@ -85,7 +85,7 @@ class SearchVideoItemModel extends BaseVideoItemModel {
     cover = (json['pic'] as String?)?.http2https;
     pubdate = json['pubdate'];
     ctime = json['senddate'];
-    duration = DurationUtil.parseDuration(json['duration']);
+    duration = DurationUtils.parseDuration(json['duration']);
     owner = SearchOwner.fromJson(json);
     stat = SearchStat.fromJson(json);
     isUnionVideo = json['is_union_video'];
@@ -165,7 +165,7 @@ class SearchUserItemModel {
   int? isUpUser;
   int? isLive;
   int? roomId;
-  Map? officialVerify;
+  BaseOfficialVerify? officialVerify;
   int? isSeniorMember;
 
   SearchUserItemModel.fromJson(Map<String, dynamic> json) {
@@ -184,7 +184,9 @@ class SearchUserItemModel {
     isUpUser = json['is_upuser'];
     isLive = json['is_live'];
     roomId = json['room_id'];
-    officialVerify = json['official_verify'];
+    officialVerify = json['official_verify'] == null
+        ? null
+        : BaseOfficialVerify.fromJson(json['official_verify']);
     isSeniorMember = json['is_senior_member'];
   }
 }
@@ -423,7 +425,7 @@ class SearchArticleItemModel {
     subTitle = title.map((e) => e.text).join();
     rankOffset = json['rank_offset'];
     mid = json['mid'];
-    imageUrls = (json['image_urls'] as List?)?.cast();
+    imageUrls = (json['image_urls'] as List?)?.fromCast();
     id = json['id'];
     categoryId = json['category_id'];
     view = json['view'];

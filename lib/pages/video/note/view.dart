@@ -36,13 +36,12 @@ class NoteListPage extends CommonSlidePage {
   State<NoteListPage> createState() => _NoteListPageState();
 }
 
-class _NoteListPageState extends CommonSlidePageState<NoteListPage> {
+class _NoteListPageState extends State<NoteListPage>
+    with SingleTickerProviderStateMixin, CommonSlideMixin {
   late final _controller = Get.put(
     NoteListPageCtr(oid: widget.oid, upperMid: widget.upperMid),
     tag: widget.heroTag,
   );
-
-  final _key = GlobalKey<ScaffoldState>();
 
   @override
   void dispose() {
@@ -54,12 +53,12 @@ class _NoteListPageState extends CommonSlidePageState<NoteListPage> {
   Widget buildPage(ThemeData theme) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      key: _key,
       body: Column(
         children: [
           SizedBox(
             height: 45,
             child: AppBar(
+              primary: false,
               automaticallyImplyLeading: false,
               titleSpacing: 16,
               toolbarHeight: 45,
@@ -68,10 +67,8 @@ class _NoteListPageState extends CommonSlidePageState<NoteListPage> {
                 final count = _controller.count.value;
                 return Text('笔记${count == -1 ? '' : '($count)'}');
               }),
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(1),
-                child: Divider(
-                  height: 1,
+              shape: Border(
+                bottom: BorderSide(
                   color: theme.colorScheme.outline.withValues(alpha: 0.1),
                 ),
               ),
@@ -93,19 +90,28 @@ class _NoteListPageState extends CommonSlidePageState<NoteListPage> {
     );
   }
 
+  late Key _key;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _key = ValueKey(PrimaryScrollController.of(context).hashCode);
+  }
+
   @override
   Widget buildList(ThemeData theme) {
     return refreshIndicator(
       onRefresh: _controller.onRefresh,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: CustomScrollView(
-              controller: _controller.scrollController,
+              key: _key,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverPadding(
-                  padding: const EdgeInsets.only(bottom: 80),
+                  padding: const EdgeInsets.only(bottom: 100),
                   sliver: Obx(
                     () => _buildBody(theme, _controller.loadingState.value),
                   ),
@@ -118,9 +124,8 @@ class _NoteListPageState extends CommonSlidePageState<NoteListPage> {
               left: 12,
               right: 12,
               top: 6,
-              bottom: MediaQuery.paddingOf(context).bottom + 6,
+              bottom: MediaQuery.viewPaddingOf(context).bottom + 6,
             ),
-            width: double.infinity,
             decoration: BoxDecoration(
               color: theme.colorScheme.onInverseSurface,
               border: Border(
@@ -130,29 +135,32 @@ class _NoteListPageState extends CommonSlidePageState<NoteListPage> {
                 ),
               ),
             ),
-            child: FilledButton.tonal(
-              style: FilledButton.styleFrom(
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                padding: EdgeInsets.zero,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(6)),
-                ),
-              ),
-              onPressed: () {
-                if (!Accounts.main.isLogin) {
-                  SmartDialog.showToast('账号未登录');
-                  return;
-                }
-                _key.currentState?.showBottomSheet(
-                  (context) => WebviewPage(
-                    oid: widget.oid,
-                    title: widget.title,
-                    url:
-                        'https://www.bilibili.com/h5/note-app?oid=${widget.oid}&pagefrom=ugcvideo&is_stein_gate=${widget.isStein ? 1 : 0}',
+            child: Builder(
+              builder: (context) => FilledButton.tonal(
+                style: FilledButton.styleFrom(
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(6)),
                   ),
-                );
-              },
-              child: const Text('开始记笔记'),
+                ),
+                onPressed: () {
+                  if (!Accounts.main.isLogin) {
+                    SmartDialog.showToast('账号未登录');
+                    return;
+                  }
+                  Scaffold.of(context).showBottomSheet(
+                    constraints: const BoxConstraints(),
+                    (context) => WebviewPage(
+                      oid: widget.oid,
+                      title: widget.title,
+                      url:
+                          'https://www.bilibili.com/h5/note-app?oid=${widget.oid}&pagefrom=ugcvideo&is_stein_gate=${widget.isStein ? 1 : 0}',
+                    ),
+                  );
+                },
+                child: const Text('开始记笔记'),
+              ),
             ),
           ),
         ],
@@ -169,15 +177,10 @@ class _NoteListPageState extends CommonSlidePageState<NoteListPage> {
       color: theme.colorScheme.outline.withValues(alpha: 0.1),
     );
     return switch (loadingState) {
-      Loading() => SliverToBoxAdapter(
-        child: ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemBuilder: (context, index) {
-            return const VideoReplySkeleton();
-          },
-          itemCount: 8,
-        ),
+      Loading() => SliverPrototypeExtentList.builder(
+        prototypeItem: const VideoReplySkeleton(),
+        itemBuilder: (_, _) => const VideoReplySkeleton(),
+        itemCount: 8,
       ),
       Success(:var response) =>
         response?.isNotEmpty == true

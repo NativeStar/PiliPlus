@@ -1,5 +1,6 @@
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
+import 'package:PiliPlus/common/widgets/list_tile.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
@@ -8,7 +9,7 @@ import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/models_new/upower_rank/rank_info.dart';
 import 'package:PiliPlus/pages/member_upower_rank/controller.dart';
 import 'package:PiliPlus/utils/utils.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ListTile;
 import 'package:get/get.dart';
 
 class UpowerRankPage extends StatefulWidget {
@@ -47,6 +48,7 @@ class _UpowerRankPageState extends State<UpowerRankPage>
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     final child = refreshIndicator(
       onRefresh: _controller.onRefresh,
       child: CustomScrollView(
@@ -54,9 +56,7 @@ class _UpowerRankPageState extends State<UpowerRankPage>
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.paddingOf(context).bottom + 80,
-            ),
+            padding: EdgeInsets.only(bottom: padding.bottom + 100),
             sliver: Obx(
               () => _bilidBody(theme, _controller.loadingState.value),
             ),
@@ -66,6 +66,7 @@ class _UpowerRankPageState extends State<UpowerRankPage>
     );
     if (widget.privilegeType == null) {
       return Scaffold(
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           title: Obx(() {
             final name = _controller.name.value;
@@ -75,10 +76,23 @@ class _UpowerRankPageState extends State<UpowerRankPage>
                     '$name 充电排行榜${_controller.memberTotal == 0 ? '' : '(${_controller.memberTotal})'}',
                   );
           }),
+          actions: [
+            TextButton(
+              onPressed: () => Get.toNamed(
+                '/webview',
+                parameters: {
+                  'url':
+                      'https://member.bilibili.com/mall/upower-pay?mid=$_upMid&oid=$_upMid',
+                },
+              ),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+              child: const Text('充电'),
+            ),
+            const SizedBox(width: 12),
+          ],
         ),
-        body: SafeArea(
-          top: false,
-          bottom: false,
+        body: Padding(
+          padding: EdgeInsets.only(left: padding.left, right: padding.right),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 625),

@@ -8,7 +8,7 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/dynamic/dyn_topic_top/topic_item.dart';
 import 'package:PiliPlus/pages/dynamics_select_topic/controller.dart';
 import 'package:PiliPlus/pages/dynamics_select_topic/widgets/item.dart';
-import 'package:PiliPlus/pages/search/controller.dart' show SearchState;
+import 'package:PiliPlus/pages/search/controller.dart' show DebounceStreamState;
 import 'package:PiliPlus/utils/context_ext.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:flutter/material.dart';
@@ -56,7 +56,8 @@ class SelectTopicPanel extends StatefulWidget {
   State<SelectTopicPanel> createState() => _SelectTopicPanelState();
 }
 
-class _SelectTopicPanelState extends SearchState<SelectTopicPanel> {
+class _SelectTopicPanelState
+    extends DebounceStreamState<SelectTopicPanel, String> {
   final _controller = Get.put(SelectTopicController());
   @override
   Duration get duration => const Duration(milliseconds: 300);
@@ -70,7 +71,7 @@ class _SelectTopicPanelState extends SearchState<SelectTopicPanel> {
   }
 
   @override
-  void onKeywordChanged(String value) => _controller
+  void onValueChanged(String value) => _controller
     ..enableClear.value = value.isNotEmpty
     ..onRefresh().whenComplete(
       () => WidgetsBinding.instance.addPostFrameCallback(
@@ -191,10 +192,7 @@ class _SelectTopicPanelState extends SearchState<SelectTopicPanel> {
         response?.isNotEmpty == true
             ? ListView.builder(
                 padding: EdgeInsets.only(
-                  bottom:
-                      MediaQuery.paddingOf(context).bottom +
-                      MediaQuery.viewInsetsOf(context).bottom +
-                      80,
+                  bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
                 ),
                 controller: widget.scrollController,
                 itemBuilder: (context, index) {

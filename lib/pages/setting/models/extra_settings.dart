@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:math' show pi, max;
 
-import 'package:PiliPlus/common/widgets/image/image_view.dart';
+import 'package:PiliPlus/common/widgets/image/custom_grid_view.dart'
+    show CustomGridView, ImageModel;
 import 'package:PiliPlus/common/widgets/pendant_avatar.dart';
-import 'package:PiliPlus/common/widgets/radio_widget.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/grpc/reply.dart';
 import 'package:PiliPlus/http/fav.dart';
@@ -24,12 +24,13 @@ import 'package:PiliPlus/pages/setting/widgets/slide_dialog.dart';
 import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/cache_manage.dart';
-import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/update.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -38,6 +39,19 @@ import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 
 List<SettingsModel> get extraSettings => [
+  if (Utils.isDesktop)
+    SettingsModel(
+      settingsType: SettingsType.sw1tch,
+      title: '退出时最小化',
+      leading: const Icon(Icons.exit_to_app),
+      setKey: SettingBoxKey.minimizeOnExit,
+      defaultVal: true,
+      onChanged: (value) {
+        try {
+          Get.find<MainController>().minimizeOnExit = value;
+        } catch (_) {}
+      },
+    ),
   SettingsModel(
     settingsType: SettingsType.sw1tch,
     title: '空降助手',
@@ -314,12 +328,13 @@ List<SettingsModel> get extraSettings => [
     setKey: SettingBoxKey.continuePlayingPart,
     defaultVal: true,
   ),
-  const SettingsModel(
+  SettingsModel(
     settingsType: SettingsType.sw1tch,
     title: '横屏在侧栏打开图片预览',
-    leading: Icon(Icons.photo_outlined),
+    leading: const Icon(Icons.photo_outlined),
     setKey: SettingBoxKey.horizontalPreview,
     defaultVal: false,
+    onChanged: (value) => CustomGridView.horizontalPreview = value,
   ),
   getBanwordModel(
     context: Get.context!,
@@ -444,10 +459,14 @@ List<SettingsModel> get extraSettings => [
     leading: const Icon(Icons.multitrack_audio),
     getSubtitle: () {
       String audioNormalization = Pref.audioNormalization;
+      // TODO: remove next version
+      if (audioNormalization == '2') {
+        GStorage.setting.put(SettingBoxKey.audioNormalization, '1');
+        audioNormalization = '1';
+      }
       audioNormalization = switch (audioNormalization) {
         '0' => AudioNormalization.disable.title,
         '1' => AudioNormalization.dynaudnorm.title,
-        '2' => AudioNormalization.loudnorm.title,
         _ => audioNormalization,
       };
       return '当前:「$audioNormalization」';
@@ -457,7 +476,7 @@ List<SettingsModel> get extraSettings => [
         context: Get.context!,
         builder: (context) {
           String audioNormalization = Pref.audioNormalization;
-          Set<String> values = {'0', '1', '2', audioNormalization, '3'};
+          final values = {'0', '1', audioNormalization, '2'};
           return SelectDialog<String>(
             title: '音量均衡',
             value: audioNormalization,
@@ -468,8 +487,7 @@ List<SettingsModel> get extraSettings => [
                     switch (e) {
                       '0' => AudioNormalization.disable.title,
                       '1' => AudioNormalization.dynaudnorm.title,
-                      '2' => AudioNormalization.loudnorm.title,
-                      '3' => AudioNormalization.custom.title,
+                      '2' => AudioNormalization.custom.title,
                       _ => e,
                     },
                   ),
@@ -479,7 +497,7 @@ List<SettingsModel> get extraSettings => [
         },
       );
       if (result != null) {
-        if (result == '3') {
+        if (result == '2') {
           String param = '';
           showDialog(
             context: Get.context!,
@@ -595,9 +613,7 @@ List<SettingsModel> get extraSettings => [
     leading: const Icon(Icons.image_outlined),
     setKey: SettingBoxKey.enableLivePhoto,
     defaultVal: true,
-    onChanged: (value) {
-      ImageModel.enableLivePhoto = value;
-    },
+    onChanged: (value) => ImageModel.enableLivePhoto = value,
   ),
   const SettingsModel(
     settingsType: SettingsType.sw1tch,
@@ -691,7 +707,7 @@ List<SettingsModel> get extraSettings => [
   ),
   SettingsModel(
     settingsType: SettingsType.sw1tch,
-    title: '侧滑关闭二级评论页面',
+    title: '侧滑关闭二级页面',
     leading: Transform.rotate(
       angle: pi * 1.5,
       child: const Icon(Icons.touch_app),
@@ -699,7 +715,7 @@ List<SettingsModel> get extraSettings => [
     setKey: SettingBoxKey.slideDismissReplyPage,
     defaultVal: Platform.isIOS,
     onChanged: (value) {
-      CommonSlidePageState.slideDismissReplyPage = value;
+      CommonSlideMixin.slideDismissReplyPage = value;
     },
   ),
   const SettingsModel(
@@ -730,6 +746,15 @@ List<SettingsModel> get extraSettings => [
     setKey: SettingBoxKey.showPgcTimeline,
     defaultVal: true,
     needReboot: true,
+  ),
+  SettingsModel(
+    settingsType: SettingsType.sw1tch,
+    title: '静默下载图片',
+    subtitle: '不显示下载 Loading 弹窗',
+    leading: const Icon(Icons.download_for_offline_outlined),
+    setKey: SettingBoxKey.silentDownImg,
+    defaultVal: false,
+    onChanged: (value) => ImageUtils.silentDownImg = value,
   ),
   SettingsModel(
     settingsType: SettingsType.sw1tch,
@@ -787,7 +812,7 @@ List<SettingsModel> get extraSettings => [
         final res = await FavHttp.allFavFolders(Accounts.main.mid);
         if (res.isSuccess) {
           final list = res.data.list;
-          if (list.isNullOrEmpty) {
+          if (list == null || list.isEmpty) {
             return;
           }
           final quickFavId = Pref.quickFavId;
@@ -797,22 +822,22 @@ List<SettingsModel> get extraSettings => [
               title: const Text('选择默认收藏夹'),
               contentPadding: const EdgeInsets.only(top: 5, bottom: 18),
               content: SingleChildScrollView(
-                child: Builder(
-                  builder: (context) => Column(
-                    children: List.generate(list!.length, (index) {
-                      final item = list[index];
-                      return RadioWidget(
-                        padding: const EdgeInsets.only(left: 14),
-                        title: item.title,
-                        groupValue: quickFavId,
+                child: RadioGroup(
+                  onChanged: (value) {
+                    Get.back();
+                    GStorage.setting.put(SettingBoxKey.quickFavId, value);
+                    SmartDialog.showToast('设置成功');
+                  },
+                  groupValue: quickFavId,
+                  child: Column(
+                    children: list.map((item) {
+                      return RadioListTile(
+                        toggleable: true,
+                        dense: true,
+                        title: Text(item.title),
                         value: item.id,
-                        onChanged: (value) {
-                          Get.back();
-                          GStorage.setting.put(SettingBoxKey.quickFavId, value);
-                          SmartDialog.showToast('设置成功');
-                        },
                       );
-                    }),
+                    }).toList(),
                   ),
                 ),
               ),
@@ -951,7 +976,7 @@ List<SettingsModel> get extraSettings => [
     settingsType: SettingsType.normal,
     title: '动态展示',
     setKey: SettingBoxKey.defaultDynamicType,
-    leading: const Icon(Icons.dynamic_feed_outlined),
+    leading: const Icon(Icons.dynamic_feed_rounded),
     getSubtitle: () =>
         '当前优先展示「${DynamicsTabType.values[Pref.defaultDynamicType].label}」',
     onTap: (setState) async {
@@ -996,6 +1021,14 @@ List<SettingsModel> get extraSettings => [
         setState();
       }
     },
+  ),
+  SettingsModel(
+    settingsType: SettingsType.sw1tch,
+    title: '显示UP主页小店TAB',
+    leading: const Icon(Icons.shop_outlined),
+    setKey: SettingBoxKey.showMemberShop,
+    defaultVal: false,
+    onChanged: (value) => MemberTabType.showMemberShop = value,
   ),
   SettingsModel(
     settingsType: SettingsType.sw1tch,
@@ -1144,7 +1177,7 @@ List<SettingsModel> get extraSettings => [
     settingsType: SettingsType.sw1tch,
     title: '检查更新',
     subtitle: '每次启动时检查是否需要更新',
-    leading: const Icon(Icons.system_update_alt_outlined),
+    leading: const Icon(Icons.system_update_alt),
     setKey: SettingBoxKey.autoUpdate,
     defaultVal: true,
     onChanged: (val) {

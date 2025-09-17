@@ -1,11 +1,11 @@
 import 'dart:async';
 
-import 'package:PiliPlus/models/user/info.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/episode.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/new_ep.dart';
 import 'package:PiliPlus/models_new/video/video_detail/episode.dart'
     hide EpisodeItem;
 import 'package:PiliPlus/pages/video/controller.dart';
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
@@ -36,22 +36,23 @@ class PgcPanel extends StatefulWidget {
 
 class _PgcPanelState extends State<PgcPanel> {
   late int currentIndex;
-  final ScrollController listViewScrollCtr = ScrollController();
+  late final ScrollController listViewScrollCtr;
   // 默认未开通
-  late int vipStatus;
+  late final bool vipStatus;
   late int cid;
   late final VideoDetailController videoDetailCtr;
-  StreamSubscription? _listener;
+  late final StreamSubscription<int> _listener;
 
   @override
   void initState() {
     super.initState();
     cid = widget.cid!;
     currentIndex = widget.pages.indexWhere((e) => e.cid == cid);
-    scrollToIndex();
+    listViewScrollCtr = ScrollController(
+      initialScrollOffset: currentIndex * 150.0,
+    );
 
-    UserInfoData? userInfo = Pref.userInfoCache;
-    vipStatus = userInfo?.vipStatus ?? 0;
+    vipStatus = Pref.userInfoCache?.vipStatus != 1;
 
     videoDetailCtr = Get.find<VideoDetailController>(tag: widget.heroTag);
 
@@ -66,7 +67,7 @@ class _PgcPanelState extends State<PgcPanel> {
 
   @override
   void dispose() {
-    _listener?.cancel();
+    _listener.cancel();
     listViewScrollCtr.dispose();
     super.dispose();
   }
@@ -86,7 +87,7 @@ class _PgcPanelState extends State<PgcPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = Theme.of(context).colorScheme;
     final currEpisode = widget.pages[currentIndex];
     final isPugv = currEpisode.from == 'pugv';
     return Column(
@@ -101,18 +102,15 @@ class _PgcPanelState extends State<PgcPanel> {
                 child: Text(
                   ' 正在播放：${currEpisode.longTitle ?? currEpisode.title}',
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.outline,
-                  ),
+                  style: TextStyle(fontSize: 12, color: theme.outline),
                 ),
               ),
               const SizedBox(width: 10),
               SizedBox(
                 height: 34,
                 child: TextButton(
-                  style: ButtonStyle(
-                    padding: WidgetStateProperty.all(EdgeInsets.zero),
+                  style: const ButtonStyle(
+                    padding: WidgetStatePropertyAll(EdgeInsets.zero),
                   ),
                   onPressed: () => widget.showEpisodes(
                     null,
@@ -136,25 +134,24 @@ class _PgcPanelState extends State<PgcPanel> {
         SizedBox(
           height: 60,
           child: ListView.builder(
+            key: const PageStorageKey(_PgcPanelState),
+            padding: EdgeInsets.zero,
             controller: listViewScrollCtr,
             scrollDirection: Axis.horizontal,
             itemCount: widget.pages.length,
             itemExtent: 150,
-            itemBuilder: (BuildContext context, int index) {
-              return _buildItem(theme, isPugv, index);
-            },
+            itemBuilder: (BuildContext context, int index) =>
+                _buildItem(theme, isPugv, index),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildItem(ThemeData theme, bool isPugv, int index) {
+  Widget _buildItem(ColorScheme theme, bool isPugv, int index) {
     final item = widget.pages[index];
     final hasLongTitle = item.longTitle?.isNotEmpty == true;
-    final color = index == currentIndex
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurface;
+    final color = index == currentIndex ? theme.primary : theme.onSurface;
     return Container(
       width: 150,
       height: 60,
@@ -162,12 +159,12 @@ class _PgcPanelState extends State<PgcPanel> {
           ? const EdgeInsets.only(right: 10)
           : null,
       child: Material(
-        color: theme.colorScheme.onInverseSurface,
+        color: theme.onInverseSurface,
         borderRadius: const BorderRadius.all(Radius.circular(6)),
         child: InkWell(
           borderRadius: const BorderRadius.all(Radius.circular(6)),
           onTap: () {
-            if (item.badge == '会员' && vipStatus != 1) {
+            if (item.badge == '会员' && vipStatus) {
               SmartDialog.showToast('需要大会员');
             }
             widget.onChangeEpisode(item);
@@ -192,7 +189,7 @@ class _PgcPanelState extends State<PgcPanel> {
                                   padding: const EdgeInsets.only(right: 6),
                                   child: Image.asset(
                                     'assets/images/live.png',
-                                    color: theme.colorScheme.primary,
+                                    color: theme.primary,
                                     height: 12,
                                     semanticLabel: "正在播放：",
                                   ),
@@ -222,7 +219,11 @@ class _PgcPanelState extends State<PgcPanel> {
                           item.badge!,
                           style: TextStyle(
                             fontSize: 11,
-                            color: theme.colorScheme.primary,
+                            color: switch (item.badge) {
+                              '限免' => theme.freeColor,
+                              '预告' => theme.onSurfaceVariant,
+                              _ => theme.primary,
+                            },
                           ),
                         ),
                     ],

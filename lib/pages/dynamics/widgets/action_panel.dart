@@ -1,9 +1,10 @@
+import 'package:PiliPlus/common/widgets/dyn/text_button.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:PiliPlus/pages/dynamics_repost/view.dart';
-import 'package:PiliPlus/utils/num_util.dart';
+import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide TextButton;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class ActionPanel extends StatelessWidget {
@@ -54,14 +55,13 @@ class ActionPanel extends StatelessWidget {
             ),
             style: btnStyle,
             label: Text(
-              forward.count != null ? NumUtil.numFormat(forward.count) : '转发',
+              forward.count != null ? NumUtils.numFormat(forward.count) : '转发',
             ),
           ),
         ),
         Expanded(
           child: TextButton.icon(
-            onPressed: () =>
-                PageUtils.pushDynDetail(item, 1, action: 'comment'),
+            onPressed: () => PageUtils.pushDynDetail(item, isPush: true),
             icon: Icon(
               FontAwesomeIcons.comment,
               size: 16,
@@ -70,7 +70,7 @@ class ActionPanel extends StatelessWidget {
             ),
             style: btnStyle,
             label: Text(
-              comment.count != null ? NumUtil.numFormat(comment.count) : '评论',
+              comment.count != null ? NumUtils.numFormat(comment.count) : '评论',
             ),
           ),
         ),
@@ -96,7 +96,7 @@ class ActionPanel extends StatelessWidget {
                 return ScaleTransition(scale: animation, child: child);
               },
               child: Text(
-                like.count != null ? NumUtil.numFormat(like.count) : '点赞',
+                like.count != null ? NumUtils.numFormat(like.count) : '点赞',
                 key: ValueKey<String>(like.count?.toString() ?? '点赞'),
                 style: TextStyle(color: like.status! ? primary : outline),
               ),

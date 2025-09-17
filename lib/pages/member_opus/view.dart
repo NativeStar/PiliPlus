@@ -39,10 +39,12 @@ class _MemberOpusState extends State<MemberOpus>
     tag: widget.heroTag,
   );
 
+  late double _maxWidth;
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final bottom = MediaQuery.paddingOf(context).bottom;
+    final bottom = MediaQuery.viewPaddingOf(context).bottom;
     return Stack(
       children: [
         refreshIndicator(
@@ -55,7 +57,7 @@ class _MemberOpusState extends State<MemberOpus>
                   top: widget.isSingle ? 12 : 0,
                   left: StyleString.safeSpace,
                   right: StyleString.safeSpace,
-                  bottom: bottom + 90,
+                  bottom: bottom + 100,
                 ),
                 sliver: Obx(() => _buildBody(_controller.loadingState.value)),
               ),
@@ -117,22 +119,26 @@ class _MemberOpusState extends State<MemberOpus>
     );
   }
 
+  late final gridDelegate = SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: Grid.smallCardWidth,
+    mainAxisSpacing: StyleString.safeSpace,
+    crossAxisSpacing: StyleString.safeSpace,
+    callback: (value) => _maxWidth = value,
+  );
+
   Widget _buildBody(LoadingState<List<SpaceOpusItemModel>?> loadingState) {
     return switch (loadingState) {
-      Loading() => SliverWaterfallFlow.extent(
-        maxCrossAxisExtent: Grid.smallCardWidth,
-        mainAxisSpacing: StyleString.safeSpace,
-        crossAxisSpacing: StyleString.safeSpace,
-        children: List.generate(10, (_) => const SpaceOpusSkeleton()),
+      Loading() => SliverWaterfallFlow(
+        gridDelegate: gridDelegate,
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => const SpaceOpusSkeleton(),
+          childCount: 10,
+        ),
       ),
       Success(:var response) =>
         response?.isNotEmpty == true
             ? SliverWaterfallFlow(
-                gridDelegate: SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: Grid.smallCardWidth,
-                  mainAxisSpacing: StyleString.safeSpace,
-                  crossAxisSpacing: StyleString.safeSpace,
-                ),
+                gridDelegate: gridDelegate,
                 delegate: SliverChildBuilderDelegate(
                   (_, index) {
                     if (index == response.length - 1) {
@@ -140,14 +146,13 @@ class _MemberOpusState extends State<MemberOpus>
                     }
                     return SpaceOpusItem(
                       item: response[index],
+                      maxWidth: _maxWidth,
                     );
                   },
                   childCount: response!.length,
                 ),
               )
-            : HttpError(
-                onReload: _controller.onReload,
-              ),
+            : HttpError(onReload: _controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: _controller.onReload,

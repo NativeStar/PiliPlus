@@ -7,7 +7,9 @@ import 'package:PiliPlus/models/common/video/live_quality.dart';
 import 'package:PiliPlus/models/common/video/video_decode_type.dart';
 import 'package:PiliPlus/models/common/video/video_quality.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
+import 'package:PiliPlus/pages/setting/widgets/multi_select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
+import 'package:PiliPlus/plugin/pl_player/models/hwdec_type.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -107,9 +109,7 @@ List<SettingsModel> get videoSettings => [
           return SelectDialog<int>(
             title: '默认画质',
             value: Pref.defaultVideoQa,
-            values: VideoQuality.values.reversed
-                .map((e) => (e.code, e.desc))
-                .toList(),
+            values: VideoQuality.values.map((e) => (e.code, e.desc)).toList(),
           );
         },
       );
@@ -132,9 +132,7 @@ List<SettingsModel> get videoSettings => [
           return SelectDialog<int>(
             title: '蜂窝网络画质',
             value: Pref.defaultVideoQaCellular,
-            values: VideoQuality.values.reversed
-                .map((e) => (e.code, e.desc))
-                .toList(),
+            values: VideoQuality.values.map((e) => (e.code, e.desc)).toList(),
           );
         },
       );
@@ -160,9 +158,7 @@ List<SettingsModel> get videoSettings => [
           return SelectDialog<int>(
             title: '默认音质',
             value: Pref.defaultAudioQa,
-            values: AudioQuality.values.reversed
-                .map((e) => (e.code, e.desc))
-                .toList(),
+            values: AudioQuality.values.map((e) => (e.code, e.desc)).toList(),
           );
         },
       );
@@ -185,9 +181,7 @@ List<SettingsModel> get videoSettings => [
           return SelectDialog<int>(
             title: '蜂窝网络音质',
             value: Pref.defaultAudioQaCellular,
-            values: AudioQuality.values.reversed
-                .map((e) => (e.code, e.desc))
-                .toList(),
+            values: AudioQuality.values.map((e) => (e.code, e.desc)).toList(),
           );
         },
       );
@@ -250,7 +244,7 @@ List<SettingsModel> get videoSettings => [
     title: '首选解码格式',
     leading: const Icon(Icons.movie_creation_outlined),
     getSubtitle: () =>
-        '首选解码格式：${VideoDecodeFormatTypeExt.fromCode(Pref.defaultDecode)!.description}，请根据设备支持情况与需求调整',
+        '首选解码格式：${VideoDecodeFormatType.fromCode(Pref.defaultDecode).description}，请根据设备支持情况与需求调整',
     onTap: (setState) async {
       String? result = await showDialog(
         context: Get.context!,
@@ -259,7 +253,7 @@ List<SettingsModel> get videoSettings => [
             title: '默认解码格式',
             value: Pref.defaultDecode,
             values: VideoDecodeFormatType.values
-                .map((e) => (e.code, e.description))
+                .map((e) => (e.codes.first, e.description))
                 .toList(),
           );
         },
@@ -274,7 +268,7 @@ List<SettingsModel> get videoSettings => [
     settingsType: SettingsType.normal,
     title: '次选解码格式',
     getSubtitle: () =>
-        '非杜比视频次选：${VideoDecodeFormatTypeExt.fromCode(Pref.secondDecode)!.description}，仍无则选择首个提供的解码格式',
+        '非杜比视频次选：${VideoDecodeFormatType.fromCode(Pref.secondDecode).description}，仍无则选择首个提供的解码格式',
     leading: const Icon(Icons.swap_horizontal_circle_outlined),
     onTap: (setState) async {
       String? result = await showDialog(
@@ -284,7 +278,7 @@ List<SettingsModel> get videoSettings => [
             title: '次选解码格式',
             value: Pref.secondDecode,
             values: VideoDecodeFormatType.values
-                .map((e) => (e.code, e.description))
+                .map((e) => (e.codes.first, e.description))
                 .toList(),
           );
         },
@@ -351,24 +345,23 @@ List<SettingsModel> get videoSettings => [
     leading: const Icon(Icons.memory_outlined),
     getSubtitle: () => '当前：${Pref.hardwareDecoding}（此项即mpv的--hwdec）',
     onTap: (setState) async {
-      String? result = await showDialog(
+      final result = await showDialog<Set<String>>(
         context: Get.context!,
         builder: (context) {
-          return SelectDialog<String>(
+          return MultiSelectDialog<String>(
             title: '硬解模式',
-            value: Pref.hardwareDecoding,
-            values: const [
-              'auto',
-              'auto-copy',
-              'auto-safe',
-              'no',
-              'yes',
-            ].map((e) => (e, e)).toList(),
+            initValues: Pref.hardwareDecoding.split(','),
+            values: {
+              for (var e in HwDecType.values) e.hwdec: '${e.hwdec}\n${e.desc}',
+            },
           );
         },
       );
-      if (result != null) {
-        await GStorage.setting.put(SettingBoxKey.hardwareDecoding, result);
+      if (result != null && result.isNotEmpty) {
+        await GStorage.setting.put(
+          SettingBoxKey.hardwareDecoding,
+          result.join(','),
+        );
         setState();
       }
     },

@@ -10,11 +10,35 @@ import 'package:waterfall_flow/waterfall_flow.dart'
 mixin DynMixin {
   late double maxWidth;
 
-  late final gridDelegate = SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
-    maxCrossAxisExtent: Grid.smallCardWidth * 2,
-    crossAxisSpacing: 4,
-    callback: (value) => maxWidth = value,
-  );
+  late final dynGridDelegate =
+      SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: Grid.smallCardWidth * 2,
+        crossAxisSpacing: 4,
+        callback: (value) => maxWidth = value,
+      );
+
+  Widget buildPage(Widget child) {
+    if (GlobalData().dynamicsWaterfallFlow) {
+      return child;
+    }
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.crossAxisExtent;
+        final cardWidth = Grid.smallCardWidth * 2;
+        final flag = cardWidth < maxWidth;
+        this.maxWidth = flag ? cardWidth : maxWidth;
+        if (!flag) {
+          return child;
+        }
+        return SliverPadding(
+          padding: EdgeInsets.symmetric(
+            horizontal: (maxWidth - cardWidth) / 2,
+          ),
+          sliver: child,
+        );
+      },
+    );
+  }
 
   late final skeDelegate = SliverGridDelegateWithExtentAndRatio(
     crossAxisSpacing: 4,
@@ -25,27 +49,17 @@ mixin DynMixin {
   );
 
   Widget get dynSkeleton {
-    if (!GlobalData().dynamicsWaterfallFlow) {
-      return SliverCrossAxisGroup(
-        slivers: [
-          const SliverFillRemaining(),
-          SliverConstrainedCrossAxis(
-            maxExtent: Grid.smallCardWidth * 2,
-            sliver: SliverList.builder(
-              itemBuilder: (_, _) => const DynamicCardSkeleton(),
-              itemCount: 10,
-            ),
-          ),
-          const SliverFillRemaining(),
-        ],
+    if (GlobalData().dynamicsWaterfallFlow) {
+      return SliverGrid.builder(
+        gridDelegate: skeDelegate,
+        itemBuilder: (_, _) => const DynamicCardSkeleton(),
+        itemCount: 10,
       );
     }
-    return SliverGrid(
-      gridDelegate: skeDelegate,
-      delegate: SliverChildBuilderDelegate(
-        (_, _) => const DynamicCardSkeleton(),
-        childCount: 10,
-      ),
+    return SliverPrototypeExtentList.builder(
+      prototypeItem: const DynamicCardSkeleton(),
+      itemBuilder: (_, _) => const DynamicCardSkeleton(),
+      itemCount: 10,
     );
   }
 }

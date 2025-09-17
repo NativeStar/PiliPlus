@@ -1,4 +1,3 @@
-import 'package:PiliPlus/common/skeleton/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -13,7 +12,7 @@ import 'package:PiliPlus/models_new/fav/fav_folder/list.dart';
 import 'package:PiliPlus/pages/dynamics_repost/view.dart';
 import 'package:PiliPlus/pages/fav_detail/controller.dart';
 import 'package:PiliPlus/pages/fav_detail/widget/fav_video_card.dart';
-import 'package:PiliPlus/utils/fav_util.dart';
+import 'package:PiliPlus/utils/fav_utils.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -28,7 +27,7 @@ class FavDetailPage extends StatefulWidget {
   State<FavDetailPage> createState() => _FavDetailPageState();
 }
 
-class _FavDetailPageState extends State<FavDetailPage> {
+class _FavDetailPageState extends State<FavDetailPage> with GridMixin {
   late final FavDetailController _favDetailController = Get.put(
     FavDetailController(),
     tag: Utils.makeHeroTag(mediaId),
@@ -41,9 +40,12 @@ class _FavDetailPageState extends State<FavDetailPage> {
     mediaId = Get.parameters['mediaId']!;
   }
 
+  late EdgeInsets padding;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    padding = MediaQuery.viewPaddingOf(context);
     return Obx(
       () {
         final enableMultiSelect = _favDetailController.enableMultiSelect.value;
@@ -65,30 +67,28 @@ class _FavDetailPageState extends State<FavDetailPage> {
                     )
                   : const SizedBox.shrink(),
             ),
-            body: SafeArea(
-              top: false,
-              bottom: false,
-              child: refreshIndicator(
-                onRefresh: _favDetailController.onRefresh,
-                child: CustomScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  controller: _favDetailController.scrollController,
-                  slivers: [
-                    _buildHeader(enableMultiSelect, theme),
-                    SliverPadding(
-                      padding: EdgeInsets.only(
-                        bottom: MediaQuery.paddingOf(context).bottom + 85,
-                      ),
-                      sliver: Obx(
-                        () => _buildBody(
-                          enableMultiSelect,
-                          theme,
-                          _favDetailController.loadingState.value,
-                        ),
+            body: refreshIndicator(
+              onRefresh: _favDetailController.onRefresh,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                controller: _favDetailController.scrollController,
+                slivers: [
+                  _buildHeader(enableMultiSelect, theme),
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      left: padding.left,
+                      right: padding.right,
+                      bottom: padding.bottom + 100,
+                    ),
+                    sliver: Obx(
+                      () => _buildBody(
+                        enableMultiSelect,
+                        theme,
+                        _favDetailController.loadingState.value,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -118,7 +118,7 @@ class _FavDetailPageState extends State<FavDetailPage> {
               ],
             )
           : null,
-      expandedHeight: kToolbarHeight + 130,
+      expandedHeight: kToolbarHeight + 127,
       pinned: true,
       title: enableMultiSelect
           ? null
@@ -161,7 +161,7 @@ class _FavDetailPageState extends State<FavDetailPage> {
       ),
       Obx(() {
         final attr = _favDetailController.folderInfo.value.attr;
-        return attr == -1 || !FavUtil.isPublicFav(attr)
+        return attr == -1 || !FavUtils.isPublicFav(attr)
             ? const SizedBox.shrink()
             : IconButton(
                 iconSize: 22,
@@ -221,7 +221,7 @@ class _FavDetailPageState extends State<FavDetailPage> {
                     _favDetailController.onFav(folderInfo.favState == 1),
                 child: Text('${folderInfo.favState == 1 ? '取消' : ''}收藏'),
               ),
-            if (FavUtil.isPublicFav(folderInfo.attr))
+            if (FavUtils.isPublicFav(folderInfo.attr))
               PopupMenuItem(
                 onTap: () => showModalBottomSheet(
                   context: context,
@@ -242,7 +242,7 @@ class _FavDetailPageState extends State<FavDetailPage> {
                 onTap: _favDetailController.cleanFav,
                 child: const Text('清除失效内容'),
               ),
-              if (!FavUtil.isDefaultFav(folderInfo.attr)) ...[
+              if (!FavUtils.isDefaultFav(folderInfo.attr)) ...[
                 const PopupMenuDivider(height: 12),
                 PopupMenuItem(
                   onTap: () => showConfirmDialog(
@@ -335,16 +335,17 @@ class _FavDetailPageState extends State<FavDetailPage> {
 
   Widget _flexibleSpace(ThemeData theme) {
     final style = TextStyle(
+      height: 1,
       fontSize: 12.5,
       color: theme.colorScheme.outline,
     );
     return FlexibleSpaceBar(
       background: Padding(
         padding: EdgeInsets.only(
-          top: kToolbarHeight + MediaQuery.paddingOf(context).top + 10,
-          left: 14,
-          right: 20,
-          bottom: 10,
+          top: kToolbarHeight + padding.top + 10,
+          left: 12 + padding.left,
+          right: 12,
+          bottom: 7,
         ),
         child: SizedBox(
           height: 110,
@@ -397,14 +398,17 @@ class _FavDetailPageState extends State<FavDetailPage> {
                   if (folderInfo.title.isNotEmpty)
                     Expanded(
                       child: Column(
-                        spacing: 4,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            folderInfo.title,
-                            style: TextStyle(
-                              fontSize: theme.textTheme.titleMedium!.fontSize,
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: Text(
+                              folderInfo.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: theme.textTheme.titleMedium!.fontSize,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           GestureDetector(
@@ -418,22 +422,20 @@ class _FavDetailPageState extends State<FavDetailPage> {
                               ),
                             ),
                           ),
-                          if (folderInfo.intro?.isNotEmpty == true)
+                          const SizedBox(height: 4),
+                          if (folderInfo.intro?.isNotEmpty == true) ...[
                             Text(
                               folderInfo.intro!,
                               style: style,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          Expanded(
-                            child: Align(
-                              alignment: Alignment.bottomLeft,
-                              child: Text(
-                                '共${folderInfo.mediaCount}条视频 · ${FavUtil.isPublicFavText(folderInfo.attr)}',
-                                textAlign: TextAlign.end,
-                                style: style,
-                              ),
-                            ),
+                            const SizedBox(height: 4),
+                          ],
+                          Text(
+                            '共${folderInfo.mediaCount}条视频 · '
+                            '${FavUtils.isPublicFavText(folderInfo.attr)}',
+                            style: style,
                           ),
                         ],
                       ),
@@ -453,48 +455,36 @@ class _FavDetailPageState extends State<FavDetailPage> {
     LoadingState<List<FavDetailItemModel>?> loadingState,
   ) {
     return switch (loadingState) {
-      Loading() => SliverGrid(
-        gridDelegate: Grid.videoCardHDelegate(context),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            return const VideoCardHSkeleton();
-          },
-          childCount: 10,
-        ),
-      ),
+      Loading() => gridSkeleton,
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: Grid.videoCardHDelegate(context),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == response.length) {
-                      _favDetailController.onLoadMore();
-                      return Container(
-                        height: 60,
-                        alignment: Alignment.center,
-                        child: Text(
-                          _favDetailController.isEnd ? '没有更多了' : '加载中...',
-                          style: TextStyle(
-                            color: theme.colorScheme.outline,
-                            fontSize: 13,
-                          ),
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length) {
+                    _favDetailController.onLoadMore();
+                    return Container(
+                      height: 60,
+                      alignment: Alignment.center,
+                      child: Text(
+                        _favDetailController.isEnd ? '没有更多了' : '加载中...',
+                        style: TextStyle(
+                          color: theme.colorScheme.outline,
+                          fontSize: 13,
                         ),
-                      );
-                    }
-                    FavDetailItemModel item = response[index];
-                    return FavVideoCardH(
-                      item: item,
-                      index: index,
-                      ctr: _favDetailController,
+                      ),
                     );
-                  },
-                  childCount: response!.length + 1,
-                ),
+                  }
+                  FavDetailItemModel item = response[index];
+                  return FavVideoCardH(
+                    item: item,
+                    index: index,
+                    ctr: _favDetailController,
+                  );
+                },
+                itemCount: response!.length + 1,
               )
-            : HttpError(
-                onReload: _favDetailController.onReload,
-              ),
+            : HttpError(onReload: _favDetailController.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: _favDetailController.onReload,

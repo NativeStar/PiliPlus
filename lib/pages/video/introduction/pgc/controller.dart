@@ -29,6 +29,7 @@ import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -323,7 +324,7 @@ class PgcIntroController extends CommonIntroController {
       queryOnlineTotal();
       queryVideoIntro(episode as EpisodeItem);
     } catch (e) {
-      debugPrint('pgc onChangeEpisode: $e');
+      if (kDebugMode) debugPrint('pgc onChangeEpisode: $e');
     }
   }
 
@@ -427,17 +428,16 @@ class PgcIntroController extends CommonIntroController {
     if (result['status']) {
       PgcTriple data = result['data'];
       late final stat = pgcItem.stat!;
-      if ((data.like == 1) != hasLike.value) {
+      if (data.like == 1 && !hasLike.value) {
         stat.like++;
         hasLike.value = true;
       }
-      final hasCoin = data.coin == 1;
-      if (this.hasCoin != hasCoin) {
+      if (data.coin == 1 && !hasCoin) {
         stat.coin += 2;
         coinNum.value = 2;
         GlobalData().afterCoin(2);
       }
-      if ((data.favorite == 1) != hasFav.value) {
+      if (data.favorite == 1 && !hasFav.value) {
         stat.favorite++;
         hasFav.value = true;
       }
@@ -483,7 +483,7 @@ class PgcIntroController extends CommonIntroController {
     videoDetail
       ..value.title = episode.showTitle
       ..refresh();
-    videoPlayerServiceHandler.onVideoDetailChange(
+    videoPlayerServiceHandler?.onVideoDetailChange(
       episode,
       cid.value,
       heroTag,

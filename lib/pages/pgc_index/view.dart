@@ -4,7 +4,8 @@ import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/common/widgets/self_sized_horizontal_list.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_index_condition/data.dart';
-import 'package:PiliPlus/models_new/pgc/pgc_index_condition/order.dart';
+import 'package:PiliPlus/models_new/pgc/pgc_index_condition/sort.dart';
+import 'package:PiliPlus/models_new/pgc/pgc_index_condition/value.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_index_result/list.dart';
 import 'package:PiliPlus/pages/pgc_index/controller.dart';
 import 'package:PiliPlus/pages/pgc_index/widgets/pgc_card_v_pgc_index.dart';
@@ -38,6 +39,7 @@ class _PgcIndexPageState extends State<PgcIndexPage>
     final theme = Theme.of(context);
     return widget.indexType == null
         ? Scaffold(
+            resizeToAvoidBottomInset: false,
             appBar: AppBar(title: const Text('索引')),
             body: Obx(() => _buildBody(theme, _ctr.conditionState.value)),
           )
@@ -48,6 +50,7 @@ class _PgcIndexPageState extends State<PgcIndexPage>
     ThemeData theme,
     LoadingState<PgcIndexConditionData> loadingState,
   ) {
+    final padding = MediaQuery.viewPaddingOf(context);
     return switch (loadingState) {
       Loading() => loadingWidget,
       Success(:var response) => Builder(
@@ -56,8 +59,8 @@ class _PgcIndexPageState extends State<PgcIndexPage>
               (response.order?.isNotEmpty == true ? 1 : 0) +
               (response.filter?.length ?? 0);
           if (count == 0) return const SizedBox.shrink();
-          return SafeArea(
-            bottom: false,
+          return Padding(
+            padding: EdgeInsets.only(left: padding.left, right: padding.right),
             child: CustomScrollView(
               controller: _ctr.scrollController,
               slivers: [
@@ -69,8 +72,8 @@ class _PgcIndexPageState extends State<PgcIndexPage>
                     alignment: Alignment.topCenter,
                     duration: const Duration(milliseconds: 200),
                     child: count > 5
-                        ? Obx(() => _buildSortWidget(theme, count, response))
-                        : _buildSortWidget(theme, count, response),
+                        ? Obx(() => _buildSortsWidget(theme, count, response))
+                        : _buildSortsWidget(theme, count, response),
                   ),
                 ),
                 SliverPadding(
@@ -78,7 +81,7 @@ class _PgcIndexPageState extends State<PgcIndexPage>
                     left: StyleString.safeSpace,
                     right: StyleString.safeSpace,
                     top: 12,
-                    bottom: MediaQuery.paddingOf(context).bottom + 80,
+                    bottom: padding.bottom + 100,
                   ),
                   sliver: Obx(() => _buildList(_ctr.loadingState.value)),
                 ),
@@ -97,6 +100,64 @@ class _PgcIndexPageState extends State<PgcIndexPage>
   }
 
   Widget _buildSortWidget(
+    ThemeData theme,
+    int index,
+    PgcIndexConditionData data,
+    item,
+  ) {
+    if (item case PgcConditionOrder e) {
+      return Obx(
+        () {
+          final isCurr = _ctr.indexParams['order'] == e.field;
+          return SearchText(
+            bgColor: isCurr
+                ? theme.colorScheme.secondaryContainer
+                : Colors.transparent,
+            textColor: isCurr
+                ? theme.colorScheme.onSecondaryContainer
+                : theme.colorScheme.onSurfaceVariant,
+            text: e.name!,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 6,
+              vertical: 3,
+            ),
+            onTap: (_) => _ctr
+              ..indexParams['order'] = e.field
+              ..onReload(),
+          );
+        },
+      );
+    }
+    if (item case PgcConditionValue e) {
+      final hasOrder = data.order?.isNotEmpty == true;
+      if (hasOrder) index -= 1;
+      final key = data.filter![index].field!;
+      return Obx(
+        () {
+          final isCurr = _ctr.indexParams[key] == e.keyword;
+          return SearchText(
+            bgColor: isCurr
+                ? theme.colorScheme.secondaryContainer
+                : Colors.transparent,
+            textColor: isCurr
+                ? theme.colorScheme.onSecondaryContainer
+                : theme.colorScheme.onSurfaceVariant,
+            text: e.name!,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 6,
+              vertical: 3,
+            ),
+            onTap: (_) => _ctr
+              ..indexParams[key] = e.keyword
+              ..onReload(),
+          );
+        },
+      );
+    }
+    throw UnsupportedError('${item.runtimeType}');
+  }
+
+  Widget _buildSortsWidget(
     ThemeData theme,
     int count,
     PgcIndexConditionData data,
@@ -118,61 +179,18 @@ class _PgcIndexPageState extends State<PgcIndexPage>
               : data.filter![index].values;
           return item?.isNotEmpty == true
               ? Padding(
-                  padding: EdgeInsets.only(
-                    top: index == 0 ? 0 : 10,
-                  ),
+                  padding: index == 0
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.only(top: 10),
                   child: SelfSizedHorizontalList(
                     gapSize: 12,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     childBuilder: (childIndex) {
-                      final e = item[childIndex];
-                      return Obx(
-                        () => SearchText(
-                          bgColor:
-                              (e is PgcConditionOrder
-                                      ? _ctr.indexParams['order']
-                                      : _ctr.indexParams[data
-                                            .filter![data.order?.isNotEmpty ==
-                                                    true
-                                                ? index - 1
-                                                : index]
-                                            .field]) ==
-                                  (e is PgcConditionOrder ? e.field : e.keyword)
-                              ? theme.colorScheme.secondaryContainer
-                              : Colors.transparent,
-                          textColor:
-                              (e is PgcConditionOrder
-                                      ? _ctr.indexParams['order']
-                                      : _ctr.indexParams[data
-                                            .filter![data.order?.isNotEmpty ==
-                                                    true
-                                                ? index - 1
-                                                : index]
-                                            .field]) ==
-                                  (e is PgcConditionOrder ? e.field : e.keyword)
-                              ? theme.colorScheme.onSecondaryContainer
-                              : theme.colorScheme.onSurfaceVariant,
-                          text: e.name,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 3,
-                          ),
-                          onTap: (_) {
-                            String name = e is PgcConditionOrder
-                                ? 'order'
-                                : data
-                                      .filter![data.order?.isNotEmpty == true
-                                          ? index - 1
-                                          : index]
-                                      .field!;
-                            _ctr.indexParams[name] = (e is PgcConditionOrder
-                                ? e.field
-                                : e.keyword);
-                            _ctr.onReload();
-                          },
-                        ),
+                      return _buildSortWidget(
+                        theme,
+                        index,
+                        data,
+                        item[childIndex],
                       );
                     },
                     itemCount: item!.length,
@@ -211,28 +229,28 @@ class _PgcIndexPageState extends State<PgcIndexPage>
     ],
   );
 
+  late final gridDelegate = SliverGridDelegateWithExtentAndRatio(
+    mainAxisSpacing: StyleString.cardSpace,
+    crossAxisSpacing: StyleString.cardSpace,
+    maxCrossAxisExtent: Grid.smallCardWidth * 0.6,
+    childAspectRatio: 0.75,
+    mainAxisExtent: MediaQuery.textScalerOf(context).scale(50),
+  );
+
   Widget _buildList(LoadingState<List<PgcIndexItem>?> loadingState) {
     return switch (loadingState) {
       Loading() => linearLoading,
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: SliverGridDelegateWithExtentAndRatio(
-                  mainAxisSpacing: StyleString.cardSpace,
-                  crossAxisSpacing: StyleString.cardSpace,
-                  maxCrossAxisExtent: Grid.smallCardWidth / 3 * 2,
-                  childAspectRatio: 0.75,
-                  mainAxisExtent: MediaQuery.textScalerOf(context).scale(50),
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (BuildContext context, int index) {
-                    if (index == response.length - 1) {
-                      _ctr.onLoadMore();
-                    }
-                    return PgcCardVPgcIndex(item: response[index]);
-                  },
-                  childCount: response!.length,
-                ),
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    _ctr.onLoadMore();
+                  }
+                  return PgcCardVPgcIndex(item: response[index]);
+                },
+                itemCount: response!.length,
               )
             : HttpError(onReload: _ctr.onReload),
       Error(:var errMsg) => HttpError(

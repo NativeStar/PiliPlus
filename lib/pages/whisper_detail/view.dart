@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
-import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/text_field/text_field.dart';
 import 'package:PiliPlus/grpc/bilibili/im/type.pb.dart' show Msg;
 import 'package:PiliPlus/http/loading_state.dart';
@@ -44,6 +43,7 @@ class _WhisperDetailPageState
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
@@ -122,9 +122,11 @@ class _WhisperDetailPageState
           const SizedBox(width: 10),
         ],
       ),
-      body: SafeArea(
-        top: false,
-        bottom: false,
+      body: Padding(
+        padding: EdgeInsets.only(
+          left: padding.left,
+          right: padding.right,
+        ),
         child: Column(
           children: [
             Expanded(
@@ -133,8 +135,8 @@ class _WhisperDetailPageState
                   hidePanel();
                 },
                 behavior: HitTestBehavior.opaque,
-                child: refreshIndicator(
-                  onRefresh: _whisperDetailController.onRefresh,
+                child: Align(
+                  alignment: Alignment.topCenter,
                   child: Obx(
                     () =>
                         _buildBody(_whisperDetailController.loadingState.value),
@@ -146,7 +148,7 @@ class _WhisperDetailPageState
               _buildInputView(theme),
               buildPanelContainer(theme, theme.colorScheme.onInverseSurface),
             ] else
-              SizedBox(height: MediaQuery.paddingOf(context).bottom),
+              SizedBox(height: padding.bottom),
           ],
         ),
       ),
@@ -185,9 +187,7 @@ class _WhisperDetailPageState
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 12),
               )
-            : scrollErrorWidget(
-                onReload: _whisperDetailController.onReload,
-              ),
+            : scrollErrorWidget(onReload: _whisperDetailController.onReload),
       Error(:var errMsg) => scrollErrorWidget(
         errMsg: errMsg,
         onReload: _whisperDetailController.onReload,
@@ -233,10 +233,7 @@ class _WhisperDetailPageState
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         color: theme.colorScheme.onInverseSurface,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(16),
-          topRight: Radius.circular(16),
-        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,

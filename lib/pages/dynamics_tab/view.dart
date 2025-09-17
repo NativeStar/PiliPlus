@@ -12,14 +12,13 @@ import 'package:PiliPlus/pages/dynamics/widgets/dynamic_panel.dart';
 import 'package:PiliPlus/pages/dynamics_tab/controller.dart';
 import 'package:PiliPlus/pages/main/controller.dart';
 import 'package:PiliPlus/utils/global_data.dart';
-import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/waterfall.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:waterfall_flow/waterfall_flow.dart'
     hide SliverWaterfallFlowDelegateWithMaxCrossAxisExtent;
 
-class DynamicsTabPage extends CommonPage {
+class DynamicsTabPage extends StatefulWidget {
   const DynamicsTabPage({super.key, required this.dynamicsType});
 
   final DynamicsTabType dynamicsType;
@@ -88,10 +87,10 @@ class _DynamicsTabPageState
         controller: controller.scrollController,
         slivers: [
           SliverPadding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.paddingOf(context).bottom + 80,
+            padding: const EdgeInsets.only(bottom: 100),
+            sliver: buildPage(
+              Obx(() => _buildBody(controller.loadingState.value)),
             ),
-            sliver: Obx(() => _buildBody(controller.loadingState.value)),
           ),
         ],
       ),
@@ -105,51 +104,43 @@ class _DynamicsTabPageState
         response?.isNotEmpty == true
             ? GlobalData().dynamicsWaterfallFlow
                   ? SliverWaterfallFlow(
-                      gridDelegate: gridDelegate,
+                      gridDelegate: dynGridDelegate,
                       delegate: SliverChildBuilderDelegate(
                         (_, index) {
                           if (index == response.length - 1) {
                             controller.onLoadMore();
                           }
+                          final item = response[index];
                           return DynamicPanel(
-                            item: response[index],
+                            item: item,
                             onRemove: (idStr) =>
                                 controller.onRemove(index, idStr),
                             onBlock: () => controller.onBlock(index),
                             maxWidth: maxWidth,
+                            onUnfold: () => controller.onUnfold(item, index),
                           );
                         },
                         childCount: response!.length,
                       ),
                     )
-                  : SliverCrossAxisGroup(
-                      slivers: [
-                        const SliverFillRemaining(),
-                        SliverConstrainedCrossAxis(
-                          maxExtent: Grid.smallCardWidth * 2,
-                          sliver: SliverList.builder(
-                            itemBuilder: (context, index) {
-                              if (index == response.length - 1) {
-                                controller.onLoadMore();
-                              }
-                              final item = response[index];
-                              return DynamicPanel(
-                                item: item,
-                                onRemove: (idStr) =>
-                                    controller.onRemove(index, idStr),
-                                onBlock: () => controller.onBlock(index),
-                                maxWidth: maxWidth,
-                              );
-                            },
-                            itemCount: response!.length,
-                          ),
-                        ),
-                        const SliverFillRemaining(),
-                      ],
+                  : SliverList.builder(
+                      itemBuilder: (context, index) {
+                        if (index == response.length - 1) {
+                          controller.onLoadMore();
+                        }
+                        final item = response[index];
+                        return DynamicPanel(
+                          item: item,
+                          onRemove: (idStr) =>
+                              controller.onRemove(index, idStr),
+                          onBlock: () => controller.onBlock(index),
+                          maxWidth: maxWidth,
+                          onUnfold: () => controller.onUnfold(item, index),
+                        );
+                      },
+                      itemCount: response!.length,
                     )
-            : HttpError(
-                onReload: controller.onReload,
-              ),
+            : HttpError(onReload: controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: controller.onReload,

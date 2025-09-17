@@ -1,11 +1,12 @@
+import 'package:PiliPlus/common/widgets/list_tile.dart';
 import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/pages/setting/models/recommend_settings.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ListTile;
 
 class RecommendSetting extends StatefulWidget {
-  const RecommendSetting({super.key, this.showAppBar});
+  const RecommendSetting({super.key, this.showAppBar = true});
 
-  final bool? showAppBar;
+  final bool showAppBar;
 
   @override
   State<RecommendSetting> createState() => _RecommendSettingState();
@@ -24,14 +25,19 @@ class _RecommendSettingState extends State<RecommendSetting> {
 
   @override
   Widget build(BuildContext context) {
+    final showAppBar = widget.showAppBar;
+    final padding = MediaQuery.viewPaddingOf(context);
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: widget.showAppBar == false
           ? null
           : AppBar(title: const Text('推荐流设置')),
       body: ListView(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.paddingOf(context).bottom + 80,
+          left: showAppBar ? padding.left : 0,
+          right: showAppBar ? padding.right : 0,
+          bottom: padding.bottom + 100,
         ),
         children: [
           ...part.map((item) => item.widget),

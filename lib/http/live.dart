@@ -18,6 +18,7 @@ import 'package:PiliPlus/models_new/live/live_room_info_h5/data.dart';
 import 'package:PiliPlus/models_new/live/live_room_play_info/data.dart';
 import 'package:PiliPlus/models_new/live/live_search/data.dart';
 import 'package:PiliPlus/models_new/live/live_second_list/data.dart';
+import 'package:PiliPlus/models_new/live/live_superchat/data.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/app_sign.dart';
 import 'package:PiliPlus/utils/wbi_sign.dart';
@@ -165,10 +166,10 @@ class LiveHttp {
   static Future<LoadingState<LiveIndexData>> liveFeedIndex({
     required int pn,
     required bool isLogin,
-    bool? moduleSelect,
+    bool moduleSelect = false,
   }) async {
     final params = {
-      if (isLogin) 'access_key': Accounts.main.accessKey,
+      'access_key': ?Accounts.main.accessKey,
       'appkey': Constants.appKey,
       'channel': 'master',
       'actionKey': 'appkey',
@@ -181,7 +182,7 @@ class LiveHttp {
       'fnval': 912,
       'disable_rcmd': 0,
       'https_url_req': 1,
-      if (moduleSelect == true) 'module_select': 1,
+      if (moduleSelect) 'module_select': 1,
       'mobi_app': 'android',
       'network': 'wifi',
       'page': pn,
@@ -250,7 +251,7 @@ class LiveHttp {
     String? sortType,
   }) async {
     final params = {
-      if (isLogin) 'access_key': Accounts.main.accessKey,
+      'access_key': ?Accounts.main.accessKey,
       'appkey': Constants.appKey,
       'actionKey': 'appkey',
       'channel': 'master',
@@ -316,7 +317,7 @@ class LiveHttp {
     required bool isLogin,
   }) async {
     final params = {
-      if (isLogin) 'access_key': Accounts.main.accessKey,
+      'access_key': ?Accounts.main.accessKey,
       'appkey': Constants.appKey,
       'actionKey': 'appkey',
       'build': 8430300,
@@ -355,7 +356,7 @@ class LiveHttp {
     required bool isLogin,
   }) async {
     final params = {
-      if (isLogin) 'access_key': Accounts.main.accessKey,
+      'access_key': ?Accounts.main.accessKey,
       'appkey': Constants.appKey,
       'actionKey': 'appkey',
       'build': 8430300,
@@ -435,7 +436,7 @@ class LiveHttp {
     required parentid,
   }) async {
     final params = {
-      if (isLogin) 'access_key': Accounts.main.accessKey,
+      'access_key': ?Accounts.main.accessKey,
       'appkey': Constants.appKey,
       'actionKey': 'appkey',
       'build': 8430300,
@@ -478,7 +479,7 @@ class LiveHttp {
     required LiveSearchType type,
   }) async {
     final params = {
-      if (isLogin) 'access_key': Accounts.main.accessKey,
+      'access_key': ?Accounts.main.accessKey,
       'appkey': Constants.appKey,
       'actionKey': 'appkey',
       'build': 8430300,
@@ -640,6 +641,26 @@ class LiveHttp {
       return {'status': true};
     } else {
       return {'status': false, 'msg': res.data['message']};
+    }
+  }
+
+  static Future<LoadingState<SuperChatData>> superChatMsg(
+    dynamic roomId,
+  ) async {
+    var res = await Request().get(
+      Api.superChatMsg,
+      queryParameters: {
+        'room_id': roomId,
+      },
+    );
+    if (res.data['code'] == 0) {
+      try {
+        return Success(SuperChatData.fromJson(res.data['data']));
+      } catch (e) {
+        return Error(e.toString());
+      }
+    } else {
+      return Error(res.data['message']);
     }
   }
 }

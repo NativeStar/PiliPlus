@@ -7,7 +7,7 @@ import 'package:PiliPlus/models/common/live_dm_silent_type.dart';
 import 'package:PiliPlus/models_new/live/live_dm_block/shield_user_list.dart';
 import 'package:PiliPlus/pages/live_dm_block/controller.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
-import 'package:PiliPlus/utils/context_ext.dart';
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/material.dart';
@@ -27,12 +27,13 @@ class _LiveDmBlockPageState extends State<LiveDmBlockPage> {
     tag: Utils.generateRandomString(8),
   );
   late bool isPortrait;
+  late EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) {
-    isPortrait = context.isPortrait;
+    isPortrait = MediaQuery.sizeOf(context).isPortrait;
+    padding = MediaQuery.viewPaddingOf(context);
     final theme = Theme.of(context);
-
     Widget tabBar = TabBar(
       controller: _controller.tabController,
       tabs: const [
@@ -84,11 +85,9 @@ class _LiveDmBlockPageState extends State<LiveDmBlockPage> {
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: AppBar(
-        title: const Text('弹幕屏蔽'),
-      ),
-      body: SafeArea(
-        bottom: false,
+      appBar: AppBar(title: const Text('弹幕屏蔽')),
+      body: Padding(
+        padding: EdgeInsets.only(left: padding.left, right: padding.right),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -151,7 +150,7 @@ class _LiveDmBlockPageState extends State<LiveDmBlockPage> {
                   ),
             Positioned(
               right: 16,
-              bottom: 16 + MediaQuery.paddingOf(context).bottom,
+              bottom: 16 + padding.bottom,
               child: FloatingActionButton(
                 tooltip: '添加',
                 onPressed: _addShieldKeyword,
@@ -173,7 +172,7 @@ class _LiveDmBlockPageState extends State<LiveDmBlockPage> {
         top: 12,
         left: 12,
         right: 12,
-        bottom: MediaQuery.paddingOf(context).bottom + 80,
+        bottom: padding.bottom + 100,
       ),
       child: Wrap(
         spacing: 12,

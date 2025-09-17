@@ -2,9 +2,11 @@ import 'dart:math';
 
 import 'package:PiliPlus/common/widgets/interactiveviewer_gallery/hero_dialog_route.dart';
 import 'package:PiliPlus/common/widgets/interactiveviewer_gallery/interactiveviewer_gallery.dart';
+import 'package:PiliPlus/common/widgets/marquee.dart';
 import 'package:PiliPlus/grpc/im.dart';
 import 'package:PiliPlus/http/dynamics.dart';
 import 'package:PiliPlus/http/search.dart';
+import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/common/image_preview_type.dart';
 import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/models/dynamics/result.dart';
@@ -33,7 +35,7 @@ import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
 import 'package:url_launcher/url_launcher.dart';
 
-class PageUtils {
+abstract class PageUtils {
   static final RouteObserver<PageRoute> routeObserver =
       RouteObserver<PageRoute>();
 
@@ -43,14 +45,12 @@ class PageUtils {
     ValueChanged<int>? onDismissed,
     int? quality,
   }) {
-    bool isMemberPage = Get.currentRoute.startsWith('/member?');
-    return Navigator.of(Get.context!).push(
+    return Get.key.currentState!.push<void>(
       HeroDialogRoute(
         builder: (context) => InteractiveviewerGallery(
           sources: imgList,
           initIndex: initialPage,
           onDismissed: onDismissed,
-          setStatusBar: !isMemberPage,
           quality: quality ?? GlobalData().imgQuality,
         ),
       ),
@@ -293,14 +293,14 @@ class PageUtils {
 
   static Future<void> pushDynFromId({id, rid, bool off = false}) async {
     SmartDialog.showLoading();
-    var res = await DynamicsHttp.dynamicDetail(
+    final res = await DynamicsHttp.dynamicDetail(
       id: id,
       rid: rid,
       type: rid != null ? 2 : null,
     );
     SmartDialog.dismiss();
-    if (res['status']) {
-      DynamicItemModel data = res['data'];
+    if (res.isSuccess) {
+      final data = res.data;
       if (data.basic?.commentType == 12) {
         toDupNamed(
           '/articlePage',
@@ -314,13 +314,13 @@ class PageUtils {
         toDupNamed(
           '/dynamicDetail',
           arguments: {
-            'item': res['data'],
+            'item': data,
           },
           off: off,
         );
       }
     } else {
-      SmartDialog.showToast(res['msg']);
+      res.toast();
     }
   }
 
@@ -380,9 +380,8 @@ class PageUtils {
   }
 
   static Future<void> pushDynDetail(
-    DynamicItemModel item,
-    floor, {
-    action = 'all',
+    DynamicItemModel item, {
+    bool isPush = false,
   }) async {
     feedBack();
 
@@ -406,7 +405,7 @@ class PageUtils {
     }
 
     /// 点击评论action 直接查看评论
-    if (action == 'comment') {
+    if (isPush) {
       push();
       return;
     }
@@ -415,26 +414,37 @@ class PageUtils {
 
     switch (item.type) {
       case 'DYNAMIC_TYPE_AV':
-        if (item.modules.moduleDynamic?.major?.archive?.type == 2) {
-          if (item.modules.moduleDynamic!.major!.archive!.jumpUrl!.startsWith(
-            '//',
-          )) {
-            item.modules.moduleDynamic!.major!.archive!.jumpUrl =
-                'https:${item.modules.moduleDynamic!.major!.archive!.jumpUrl!}';
+        final archive = item.modules.moduleDynamic!.major!.archive!;
+        // pgc
+        if (archive.type == 2) {
+          // jumpUrl
+          if (archive.jumpUrl case final jumpUrl?) {
+            if (viewPgcFromUri(jumpUrl)) {
+              return;
+            }
           }
-          String? redirectUrl = await UrlUtils.parseRedirectUrl(
-            item.modules.moduleDynamic!.major!.archive!.jumpUrl!,
-            false,
-          );
-          if (redirectUrl != null) {
-            viewPgcFromUri(redirectUrl);
-            return;
+          // redirectUrl from intro
+          final res = await VideoHttp.videoIntro(bvid: archive.bvid!);
+          if (res.dataOrNull?.redirectUrl case final redirectUrl?) {
+            if (viewPgcFromUri(redirectUrl)) {
+              return;
+            }
+          }
+          // redirectUrl from jumpUrl
+          if (await UrlUtils.parseRedirectUrl(
+                archive.jumpUrl.http2https,
+                false,
+              )
+              case final redirectUrl?) {
+            if (viewPgcFromUri(redirectUrl)) {
+              return;
+            }
           }
         }
 
         try {
-          String bvid = item.modules.moduleDynamic!.major!.archive!.bvid!;
-          String cover = item.modules.moduleDynamic!.major!.archive!.cover!;
+          String bvid = archive.bvid!;
+          String cover = archive.cover!;
           int? cid = await SearchHttp.ab2c(bvid: bvid);
           if (cid != null) {
             toVideoPage(
@@ -458,8 +468,9 @@ class PageUtils {
           },
         );
         break;
+
       case 'DYNAMIC_TYPE_PGC':
-        if (kDebugMode) debugPrint('番剧');
+        // if (kDebugMode) debugPrint('番剧');
         SmartDialog.showToast('暂未支持的类型，请联系开发者');
         break;
 
@@ -467,6 +478,18 @@ class PageUtils {
         DynamicLiveModel liveRcmd =
             item.modules.moduleDynamic!.major!.liveRcmd!;
         toLiveRoom(liveRcmd.roomId);
+        break;
+
+      case 'DYNAMIC_TYPE_SUBSCRIPTION_NEW':
+        LivePlayInfo live = item
+            .modules
+            .moduleDynamic!
+            .major!
+            .subscriptionNew!
+            .liveRcmd!
+            .content!
+            .livePlayInfo!;
+        toLiveRoom(live.roomId);
         break;
 
       /// 合集查看
@@ -489,33 +512,39 @@ class PageUtils {
 
       /// 番剧查看
       case 'DYNAMIC_TYPE_PGC_UNION':
-        if (kDebugMode) debugPrint('DYNAMIC_TYPE_PGC_UNION 番剧');
+        // if (kDebugMode) debugPrint('DYNAMIC_TYPE_PGC_UNION 番剧');
         DynamicArchiveModel pgc = item.modules.moduleDynamic!.major!.pgc!;
         if (pgc.epid != null) {
           viewPgc(epId: pgc.epid);
         }
         break;
+
       case 'DYNAMIC_TYPE_MEDIALIST':
-        if (item.modules.moduleDynamic?.major?.medialist != null) {
-          final String? url =
-              item.modules.moduleDynamic!.major!.medialist!.jumpUrl;
-          if (url?.contains('medialist/detail/ml') == true) {
-            Get.toNamed(
-              '/favDetail',
-              parameters: {
-                'heroTag':
-                    '${item.modules.moduleDynamic!.major!.medialist!.cover}',
-                'mediaId':
-                    '${item.modules.moduleDynamic!.major!.medialist!.id}',
-              },
-            );
-          } else if (url != null) {
-            handleWebview(url.http2https);
+        if (item.modules.moduleDynamic?.major?.medialist
+            case final medialist?) {
+          final String? url = medialist.jumpUrl;
+          if (url != null) {
+            if (url.contains('medialist/detail/ml')) {
+              Get.toNamed(
+                '/favDetail',
+                parameters: {
+                  'heroTag': '${medialist.cover}',
+                  'mediaId': '${medialist.id}',
+                },
+              );
+            } else {
+              handleWebview(url.http2https);
+            }
           }
         }
         break;
 
-      // case 'DYNAMIC_TYPE_COURSES_SEASON':
+      case 'DYNAMIC_TYPE_COURSES_SEASON':
+        PageUtils.viewPugv(
+          seasonId: item.modules.moduleDynamic!.major!.courses!.id,
+        );
+        break;
+
       // 纯文字动态查看
       // case 'DYNAMIC_TYPE_WORD':
       // # 装扮/剧集点评/普通分享
@@ -530,24 +559,24 @@ class PageUtils {
     }
   }
 
-  static void onHorizontalPreview(
-    GlobalKey<ScaffoldState> key,
+  static void onHorizontalPreviewState(
+    ScaffoldState state,
     TickerProvider vsync,
-    List<String> imgList,
+    List<SourceModel> imgList,
     int index,
   ) {
     final ctr = AnimationController(
       vsync: vsync,
       duration: const Duration(milliseconds: 200),
     )..forward();
-    key.currentState?.showBottomSheet(
+    state.showBottomSheet(
+      constraints: const BoxConstraints(),
       (context) {
         return FadeTransition(
           opacity: Tween<double>(begin: 0, end: 1).animate(ctr),
           child: InteractiveviewerGallery(
-            sources: imgList.map((url) => SourceModel(url: url)).toList(),
+            sources: imgList,
             initIndex: index,
-            setStatusBar: false,
             onClose: (value) async {
               if (!value) {
                 try {
@@ -566,10 +595,28 @@ class PageUtils {
         );
       },
       enableDrag: false,
-      elevation: 0,
+      elevation: 0.0,
       backgroundColor: Colors.transparent,
       sheetAnimationStyle: const AnimationStyle(duration: Duration.zero),
     );
+  }
+
+  static void onHorizontalPreview(
+    BuildContext context,
+    List<SourceModel> imgList,
+    int index,
+  ) {
+    final scaffoldState = Scaffold.maybeOf(context);
+    if (scaffoldState != null) {
+      onHorizontalPreviewState(
+        scaffoldState,
+        ContextSingleTicker(scaffoldState.context),
+        imgList,
+        index,
+      );
+    } else {
+      imageView(imgList: imgList, initialPage: index);
+    }
   }
 
   static void inAppWebview(
@@ -805,6 +852,23 @@ class PageUtils {
         final hasEpisode = episodes != null && episodes.isNotEmpty;
 
         EpisodeItem? episode;
+
+        void viewSection(EpisodeItem episode) {
+          toVideoPage(
+            videoType: VideoType.ugc,
+            bvid: episode.bvid!,
+            cid: episode.cid!,
+            seasonId: data.seasonId,
+            epId: episode.epId,
+            cover: episode.cover,
+            progress: progress == null ? null : int.tryParse(progress),
+            extraArguments: {
+              'pgcApi': true,
+              'pgcItem': data,
+            },
+          );
+        }
+
         if (epId != null) {
           epId = epId.toString();
           if (hasEpisode) {
@@ -823,21 +887,7 @@ class PageUtils {
                   for (var episode in episodes) {
                     if (episode.epId.toString() == epId) {
                       // view as ugc
-                      toVideoPage(
-                        videoType: VideoType.ugc,
-                        bvid: episode.bvid!,
-                        cid: episode.cid!,
-                        seasonId: data.seasonId,
-                        epId: episode.epId,
-                        cover: episode.cover,
-                        progress: progress == null
-                            ? null
-                            : int.tryParse(progress),
-                        extraArguments: {
-                          'pgcApi': true,
-                          'pgcItem': data,
-                        },
-                      );
+                      viewSection(episode);
                       return;
                     }
                   }
@@ -866,6 +916,12 @@ class PageUtils {
             },
           );
           return;
+        } else {
+          episode ??= data.section?.firstOrNull?.episodes?.firstOrNull;
+          if (episode != null) {
+            viewSection(episode);
+            return;
+          }
         }
 
         SmartDialog.showToast('资源加载失败');

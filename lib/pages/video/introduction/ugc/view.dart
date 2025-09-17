@@ -17,12 +17,11 @@ import 'package:PiliPlus/pages/video/introduction/ugc/widgets/page.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/season.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/triple_state.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
-import 'package:PiliPlus/utils/context_ext.dart';
-import 'package:PiliPlus/utils/date_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
-import 'package:PiliPlus/utils/num_util.dart';
+import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -41,34 +40,37 @@ class UgcIntroPanel extends StatefulWidget {
     required this.showAiBottomSheet,
     required this.showEpisodes,
     required this.onShowMemberPage,
+    required this.isPortrait,
     required this.isHorizontal,
   });
   final String heroTag;
   final Function showAiBottomSheet;
   final Function showEpisodes;
   final ValueChanged<int?> onShowMemberPage;
+  final bool isPortrait;
   final bool isHorizontal;
 
   @override
   State<UgcIntroPanel> createState() => _UgcIntroPanelState();
 }
 
-class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
-    with AutomaticKeepAliveClientMixin {
+class _UgcIntroPanelState extends TripleState<UgcIntroPanel> {
   @override
-  late UgcIntroController introController;
+  late final UgcIntroController introController;
   late final VideoDetailController videoDetailCtr =
       Get.find<VideoDetailController>(tag: widget.heroTag);
 
   @override
   void initState() {
     super.initState();
-    introController = Get.put(UgcIntroController(), tag: widget.heroTag);
+    introController = Get.putOrFind(
+      UgcIntroController.new,
+      tag: widget.heroTag,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final ThemeData theme = Theme.of(context);
     const expandTheme = ExpandableThemeData(
       animationDuration: Duration(milliseconds: 300),
@@ -77,7 +79,7 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
       fadeCurve: Curves.ease,
       sizeCurve: Curves.linear,
     );
-    final isPortrait = context.isPortrait;
+    final isPortrait = widget.isPortrait;
     final isHorizontal = !isPortrait && widget.isHorizontal;
     return SliverPadding(
       padding: const EdgeInsets.only(
@@ -170,27 +172,13 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
                   const SizedBox(height: 8),
                   if (isLoading)
                     _buildVideoTitle(theme, videoDetail)
+                  else if (isHorizontal && Utils.isDesktop)
+                    _buildTitle(theme, videoDetail, isExpand: true)
                   else
                     ExpandablePanel(
                       controller: introController.expandableCtr,
-                      collapsed: GestureDetector(
-                        onLongPress: () {
-                          Feedback.forLongPress(context);
-                          Utils.copyText(videoDetail.title ?? '');
-                        },
-                        child: _buildVideoTitle(theme, videoDetail),
-                      ),
-                      expanded: GestureDetector(
-                        onLongPress: () {
-                          Feedback.forLongPress(context);
-                          Utils.copyText(videoDetail.title ?? '');
-                        },
-                        child: _buildVideoTitle(
-                          theme,
-                          videoDetail,
-                          isExpand: true,
-                        ),
-                      ),
+                      collapsed: _buildTitle(theme, videoDetail),
+                      expanded: _buildTitle(theme, videoDetail, isExpand: true),
                       theme: expandTheme,
                     ),
                   const SizedBox(height: 8),
@@ -227,48 +215,19 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
                       ),
                     ),
                   ],
-                  ExpandablePanel(
-                    controller: introController.expandableCtr,
-                    collapsed: const SizedBox.shrink(),
-                    expanded: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: () => Utils.copyText('${videoDetail.bvid}'),
-                          child: Text(
-                            videoDetail.bvid ?? '',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: theme.colorScheme.secondary,
-                            ),
-                          ),
-                        ),
-                        if (videoDetail.descV2?.isNotEmpty == true) ...[
-                          const SizedBox(height: 8),
-                          SelectableText.rich(
-                            style: const TextStyle(
-                              height: 1.4,
-                            ),
-                            TextSpan(
-                              children: [
-                                buildContent(theme, videoDetail),
-                              ],
-                            ),
-                          ),
-                        ],
-                        Obx(() {
-                          final videoTags = introController.videoTags.value;
-                          if (videoTags.isNullOrEmpty) {
-                            return const SizedBox.shrink();
-                          }
-                          return _buildTags(videoTags!);
-                        }),
-                      ],
+                  if (isHorizontal && Utils.isDesktop)
+                    ..._infos(theme, videoDetail)
+                  else
+                    ExpandablePanel(
+                      controller: introController.expandableCtr,
+                      collapsed: const SizedBox.shrink(),
+                      expanded: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _infos(theme, videoDetail),
+                      ),
+                      theme: expandTheme,
                     ),
-                    theme: expandTheme,
-                  ),
                   Obx(
                     () => introController.status.value
                         ? const SizedBox.shrink()
@@ -337,6 +296,54 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
       ),
     );
   }
+
+  Widget _buildTitle(
+    ThemeData theme,
+    VideoDetailData videoDetail, {
+    bool isExpand = false,
+  }) => GestureDetector(
+    onLongPress: () {
+      Feedback.forLongPress(context);
+      Utils.copyText(videoDetail.title ?? '');
+    },
+    child: _buildVideoTitle(
+      theme,
+      videoDetail,
+      isExpand: isExpand,
+    ),
+  );
+
+  List<Widget> _infos(ThemeData theme, VideoDetailData videoDetail) => [
+    const SizedBox(height: 8),
+    GestureDetector(
+      onTap: () => Utils.copyText('${videoDetail.bvid}'),
+      child: Text(
+        videoDetail.bvid ?? '',
+        style: TextStyle(
+          fontSize: 14,
+          color: theme.colorScheme.secondary,
+        ),
+      ),
+    ),
+    if (videoDetail.descV2?.isNotEmpty == true) ...[
+      const SizedBox(height: 8),
+      SelectableText.rich(
+        style: const TextStyle(height: 1.4),
+        TextSpan(
+          children: [
+            buildContent(theme, videoDetail),
+          ],
+        ),
+      ),
+    ],
+    Obx(() {
+      final videoTags = introController.videoTags.value;
+      if (videoTags.isNullOrEmpty) {
+        return const SizedBox.shrink();
+      }
+      return _buildTags(videoTags!);
+    }),
+  ];
 
   WidgetSpan _labelWidget(String text, Color bgColor, Color textColor) {
     return WidgetSpan(
@@ -506,6 +513,7 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
     return SizedBox(
       height: 48,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Obx(
             () => ActionItem(
@@ -515,7 +523,7 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
               selectStatus: introController.hasLike.value,
               semanticsLabel: '点赞',
               text: !isLoading
-                  ? NumUtil.numFormat(videoDetail.stat!.like)
+                  ? NumUtils.numFormat(videoDetail.stat!.like)
                   : null,
               onStartTriple: onStartTriple,
               onCancelTriple: onCancelTriple,
@@ -542,7 +550,7 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
               selectStatus: introController.hasCoin,
               semanticsLabel: '投币',
               text: !isLoading
-                  ? NumUtil.numFormat(videoDetail.stat!.coin)
+                  ? NumUtils.numFormat(videoDetail.stat!.coin)
                   : null,
             ),
           ),
@@ -559,7 +567,7 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
               selectStatus: introController.hasFav.value,
               semanticsLabel: '收藏',
               text: !isLoading
-                  ? NumUtil.numFormat(videoDetail.stat!.favorite)
+                  ? NumUtils.numFormat(videoDetail.stat!.favorite)
                   : null,
             ),
           ),
@@ -580,7 +588,7 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
             selectStatus: false,
             semanticsLabel: '分享',
             text: !isLoading
-                ? NumUtil.numFormat(videoDetail.stat!.share!)
+                ? NumUtils.numFormat(videoDetail.stat!.share!)
                 : null,
           ),
         ],
@@ -814,7 +822,7 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
               size: 35,
               badgeSize: 14,
               isVip: isVip,
-              officialType: userStat.card?.officialVerify?.type,
+              officialType: userStat.card?.official?.type,
             ),
             const SizedBox(width: 10),
             Column(
@@ -833,7 +841,7 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
                 ),
                 const SizedBox(height: 0),
                 Text(
-                  '${NumUtil.numFormat(userStat.follower)}粉丝    ${'${NumUtil.numFormat(userStat.archiveCount)}视频'}',
+                  '${NumUtils.numFormat(userStat.follower)}粉丝    ${'${NumUtils.numFormat(userStat.archiveCount)}视频'}',
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.outline,
@@ -861,7 +869,7 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
         color: theme.colorScheme.outline,
       ),
       Text(
-        DateUtil.format(videoDetail.pubdate),
+        DateFormatUtils.format(videoDetail.pubdate),
         style: TextStyle(
           fontSize: 12,
           color: theme.colorScheme.outline,
@@ -888,30 +896,28 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
   );
 
   Widget get _aiBtn => Positioned(
-    right: 10,
-    top: 0,
-    bottom: 0,
+    right: 8,
     child: Center(
-      child: Semantics(
-        label: 'AI总结',
-        child: GestureDetector(
-          onTap: () async {
-            if (introController.aiConclusionResult == null) {
-              await introController.aiConclusion();
-            }
-            if (introController.aiConclusionResult == null) {
-              return;
-            }
-            if (introController.aiConclusionResult!.summary?.isNotEmpty ==
-                    true ||
-                introController.aiConclusionResult!.outline?.isNotEmpty ==
-                    true) {
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () async {
+          if (introController.aiConclusionResult == null) {
+            await introController.aiConclusion();
+          }
+          if (introController.aiConclusionResult case final res?) {
+            if (res.summary?.isNotEmpty == true ||
+                res.outline?.isNotEmpty == true) {
               widget.showAiBottomSheet();
             } else {
               SmartDialog.showToast("当前视频不支持AI视频总结");
             }
-          },
-          child: Image.asset('assets/images/ai.png', height: 22),
+          }
+        },
+        child: Image.asset(
+          semanticLabel: 'AI总结',
+          'assets/images/ai.png',
+          height: 18,
+          width: 18,
         ),
       ),
     ),
@@ -931,11 +937,25 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
               .map(
                 (item) => SearchText(
                   fontSize: 13,
-                  text: item.tagName!,
-                  onTap: (tagName) => Get.toNamed(
-                    '/searchResult',
-                    parameters: {'keyword': tagName},
-                  ),
+                  text: switch (item.tagType) {
+                    'bgm' => item.tagName!.replaceFirst('发现', '\u{1f3b5}BGM：'),
+                    'topic' => '#${item.tagName}',
+                    _ => item.tagName!,
+                  },
+                  onTap: switch (item.tagType) {
+                    'bgm' => (_) => Get.toNamed(
+                      '/musicDetail',
+                      parameters: {'musicId': item.musicId!},
+                    ),
+                    'topic' => (_) => Get.toNamed(
+                      '/dynTopic',
+                      parameters: {'id': item.tagId!.toString()},
+                    ),
+                    _ => (tagName) => Get.toNamed(
+                      '/searchResult',
+                      parameters: {'keyword': tagName},
+                    ),
+                  },
                   onLongPress: Utils.copyText,
                 ),
               )
@@ -944,7 +964,4 @@ class _UgcIntroPanelState extends TripleState<UgcIntroPanel>
       ),
     );
   }
-
-  @override
-  bool get wantKeepAlive => true;
 }

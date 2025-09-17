@@ -38,7 +38,7 @@ class _FavTopicPageState extends State<FavTopicPage>
               left: StyleString.safeSpace,
               right: StyleString.safeSpace,
               top: StyleString.safeSpace,
-              bottom: MediaQuery.paddingOf(context).bottom + 80,
+              bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
             ),
             sliver: Obx(
               () => _buildBody(theme, _controller.loadingState.value),
@@ -48,6 +48,13 @@ class _FavTopicPageState extends State<FavTopicPage>
       ),
     );
   }
+
+  late final gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+    mainAxisSpacing: 12,
+    crossAxisSpacing: 12,
+    maxCrossAxisExtent: Grid.smallCardWidth,
+    mainAxisExtent: MediaQuery.textScalerOf(context).scale(30),
+  );
 
   Widget _buildBody(
     ThemeData theme,
@@ -64,61 +71,54 @@ class _FavTopicPageState extends State<FavTopicPage>
       ),
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  maxCrossAxisExtent: Grid.smallCardWidth,
-                  mainAxisExtent: MediaQuery.textScalerOf(context).scale(30),
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == response.length - 1) {
-                      _controller.onLoadMore();
-                    }
-                    final item = response[index];
-                    return Material(
-                      color: theme.colorScheme.onInverseSurface,
-                      borderRadius: const BorderRadius.all(Radius.circular(6)),
-                      child: InkWell(
-                        onTap: () => Get.toNamed(
-                          '/dynTopic',
-                          parameters: {
-                            'id': item.id!.toString(),
-                            'name': item.name!,
-                          },
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    _controller.onLoadMore();
+                  }
+                  final item = response[index];
+                  return Material(
+                    color: theme.colorScheme.onInverseSurface,
+                    borderRadius: const BorderRadius.all(Radius.circular(6)),
+                    child: InkWell(
+                      onTap: () => Get.toNamed(
+                        '/dynTopic',
+                        parameters: {
+                          'id': item.id!.toString(),
+                          'name': item.name!,
+                        },
+                      ),
+                      onLongPress: () => showConfirmDialog(
+                        context: context,
+                        title: '确定取消收藏？',
+                        onConfirm: () {
+                          _controller.onRemove(index, item.id);
+                        },
+                      ),
+                      borderRadius: const BorderRadius.all(
+                        Radius.circular(6),
+                      ),
+                      child: Container(
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 11,
+                          vertical: 5,
                         ),
-                        onLongPress: () => showConfirmDialog(
-                          context: context,
-                          title: '确定取消收藏？',
-                          onConfirm: () {
-                            _controller.onRemove(index, item.id);
-                          },
-                        ),
-                        borderRadius: const BorderRadius.all(
-                          Radius.circular(6),
-                        ),
-                        child: Container(
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 5,
-                          ),
-                          child: Text(
-                            '# ${item.name}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+                        child: Text(
+                          '# ${item.name}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
-                    );
-                  },
-                  childCount: response!.length,
-                ),
+                    ),
+                  );
+                },
+                itemCount: response!.length,
               )
             : HttpError(onReload: _controller.onReload),
       Error(:var errMsg) => HttpError(

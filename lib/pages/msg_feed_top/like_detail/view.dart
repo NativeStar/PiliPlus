@@ -8,7 +8,7 @@ import 'package:PiliPlus/models_new/msg/msg_like_detail/card.dart';
 import 'package:PiliPlus/models_new/msg/msg_like_detail/item.dart';
 import 'package:PiliPlus/pages/msg_feed_top/like_detail/controller.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
-import 'package:PiliPlus/utils/date_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -30,6 +30,7 @@ class _LikeDetailPageState extends State<LikeDetailPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: const Text('点赞详情')),
       body: refreshIndicator(
         onRefresh: _controller.onRefresh,
@@ -38,7 +39,7 @@ class _LikeDetailPageState extends State<LikeDetailPage> {
           slivers: [
             SliverPadding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.paddingOf(context).bottom + 80,
+                bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
               ),
               sliver: Obx(
                 () => _buildBody(theme, _controller.loadingState.value),
@@ -63,9 +64,7 @@ class _LikeDetailPageState extends State<LikeDetailPage> {
     return switch (loadingState) {
       Loading() => SliverList.builder(
         itemCount: 12,
-        itemBuilder: (context, index) {
-          return const MsgFeedTopSkeleton();
-        },
+        itemBuilder: (context, index) => const MsgFeedTopSkeleton(),
       ),
       Success(:var response) => SliverMainAxisGroup(
         slivers: [
@@ -142,7 +141,7 @@ class _LikeDetailPageState extends State<LikeDetailPage> {
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        DateUtil.dateFormat(item.likeTime),
+        DateFormatUtils.dateFormat(item.likeTime),
         style: theme.textTheme.bodyMedium!.copyWith(
           fontSize: 13,
           color: theme.colorScheme.outline,

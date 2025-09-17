@@ -2,6 +2,8 @@ import 'package:PiliPlus/common/skeleton/video_reply.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
+import 'package:PiliPlus/common/widgets/view_sliver_safe_area.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 import 'package:PiliPlus/http/loading_state.dart';
@@ -12,16 +14,15 @@ import 'package:PiliPlus/pages/common/dyn/common_dyn_page.dart';
 import 'package:PiliPlus/pages/match_info/controller.dart';
 import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
 import 'package:PiliPlus/pages/video/reply_reply/view.dart';
-import 'package:PiliPlus/utils/date_util.dart';
-import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
-import 'package:PiliPlus/utils/utils.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
-class MatchInfoPage extends CommonDynPage {
+class MatchInfoPage extends StatefulWidget {
   const MatchInfoPage({super.key});
 
   @override
@@ -30,55 +31,41 @@ class MatchInfoPage extends CommonDynPage {
 
 class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
   @override
-  final MatchInfoController controller = Get.put(
-    MatchInfoController(),
-    tag: Utils.generateRandomString(8),
+  final MatchInfoController controller = Get.putOrFind(
+    MatchInfoController.new,
+    tag: Get.parameters['cid']!,
   );
 
   @override
   dynamic get arguments => null;
 
   @override
+  Offset get fabOffset => const Offset(0, 2);
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: const Text('比赛详情')),
-      body: SafeArea(
-        bottom: false,
-        child: refreshIndicator(
-          onRefresh: controller.onRefresh,
-          child: CustomScrollView(
-            controller: controller.scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              Obx(() => _buildInfo(theme, controller.infoState.value)),
-              SliverPadding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.paddingOf(context).bottom + 80,
-                ),
-                sliver: Obx(
-                  () => _buildReply(theme, controller.loadingState.value),
-                ),
+      body: refreshIndicator(
+        onRefresh: controller.onRefresh,
+        child: CustomScrollView(
+          controller: scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            Obx(() => _buildInfo(theme, controller.infoState.value)),
+            ViewSliverSafeArea(
+              sliver: Obx(
+                () => _buildReply(theme, controller.loadingState.value),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: SlideTransition(
-        position: controller.fabAnim,
-        child: FloatingActionButton(
-          heroTag: null,
-          onPressed: () {
-            feedBack();
-            controller.onReply(
-              context,
-              oid: controller.oid,
-              replyType: controller.replyType,
-            );
-          },
-          tooltip: '评论动态',
-          child: const Icon(Icons.reply),
-        ),
+        position: fabAnim,
+        child: replyButton,
       ),
     );
   }
@@ -169,14 +156,14 @@ class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
                             )
                           else if (data.contestStatus == 3)
                             Text(
-                              '${DateUtil.dateFormat(data.stime)}${data.contestStatus == 3 ? ' 已结束' : ''}',
+                              '${DateFormatUtils.dateFormat(data.stime)}${data.contestStatus == 3 ? ' 已结束' : ''}',
                               style: TextStyle(
                                 color: theme.colorScheme.outline,
                               ),
                             )
                           else if (data.contestStatus == 1)
                             Text(
-                              DateUtil.format(
+                              DateFormatUtils.format(
                                 data.stime,
                                 format: DateFormat('yy-MM-dd HH:mm'),
                               ),
@@ -231,7 +218,7 @@ class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
                         replyItem: response[index],
                         replyLevel: 1,
                         replyReply: (replyItem, id) =>
-                            replyReply(context, replyItem, id),
+                            replyReply(context, replyItem, id, theme),
                         onReply: (replyItem) => controller.onReply(
                           context,
                           replyItem: replyItem,
@@ -261,16 +248,27 @@ class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
   }
 
   @override
-  void replyReply(BuildContext context, ReplyInfo replyItem, int? id) {
+  void replyReply(
+    BuildContext context,
+    ReplyInfo replyItem,
+    int? id,
+    ThemeData theme,
+  ) {
     EasyThrottle.throttle('replyReply', const Duration(milliseconds: 500), () {
       int oid = replyItem.oid.toInt();
       int rpid = replyItem.id.toInt();
       Get.to(
         Scaffold(
-          appBar: AppBar(title: const Text('评论详情')),
-          body: SafeArea(
-            top: false,
-            bottom: false,
+          resizeToAvoidBottomInset: false,
+          appBar: AppBar(
+            title: const Text('评论详情'),
+            shape: Border(
+              bottom: BorderSide(
+                color: theme.colorScheme.outline.withValues(alpha: 0.1),
+              ),
+            ),
+          ),
+          body: ViewSafeArea(
             child: VideoReplyReplyPanel(
               enableSlide: false,
               id: id,

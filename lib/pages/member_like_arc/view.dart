@@ -36,61 +36,53 @@ class _MemberLikeArcPageState extends State<MemberLikeArcPage> {
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.viewPaddingOf(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(
           '${widget.mid == accountService.mid ? '我' : '${widget.name}'}的推荐',
         ),
       ),
-      body: SafeArea(
-        top: false,
-        bottom: false,
-        child: refreshIndicator(
-          onRefresh: _ctr.onRefresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: EdgeInsets.only(
-                  top: 7,
-                  left: StyleString.safeSpace,
-                  right: StyleString.safeSpace,
-                  bottom: MediaQuery.paddingOf(context).bottom + 80,
-                ),
-                sliver: Obx(() => _buildBody(_ctr.loadingState.value)),
+      body: refreshIndicator(
+        onRefresh: _ctr.onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.only(
+                top: 7,
+                left: StyleString.safeSpace + padding.left,
+                right: StyleString.safeSpace + padding.right,
+                bottom: padding.bottom + 100,
               ),
-            ],
-          ),
+              sliver: Obx(() => _buildBody(_ctr.loadingState.value)),
+            ),
+          ],
         ),
       ),
     );
   }
 
+  late final gridDelegate = SliverGridDelegateWithExtentAndRatio(
+    mainAxisSpacing: StyleString.cardSpace,
+    crossAxisSpacing: StyleString.cardSpace,
+    maxCrossAxisExtent: Grid.smallCardWidth,
+    childAspectRatio: StyleString.aspectRatio,
+    mainAxisExtent: MediaQuery.textScalerOf(context).scale(75),
+  );
+
   Widget _buildBody(LoadingState<List<CoinLikeArcItem>?> loadingState) {
     return switch (loadingState) {
       Loading() => SliverGrid.builder(
-        gridDelegate: SliverGridDelegateWithExtentAndRatio(
-          mainAxisSpacing: StyleString.cardSpace,
-          crossAxisSpacing: StyleString.cardSpace,
-          maxCrossAxisExtent: Grid.smallCardWidth,
-          childAspectRatio: StyleString.aspectRatio,
-          mainAxisExtent: MediaQuery.textScalerOf(context).scale(90),
-        ),
+        gridDelegate: gridDelegate,
         itemCount: 16,
-        itemBuilder: (context, index) {
-          return const VideoCardVSkeleton();
-        },
+        itemBuilder: (context, index) => const VideoCardVSkeleton(),
       ),
       Success(:var response) =>
         response?.isNotEmpty == true
             ? SliverGrid.builder(
-                gridDelegate: SliverGridDelegateWithExtentAndRatio(
-                  mainAxisSpacing: StyleString.cardSpace,
-                  crossAxisSpacing: StyleString.cardSpace,
-                  maxCrossAxisExtent: Grid.smallCardWidth,
-                  childAspectRatio: StyleString.aspectRatio,
-                  mainAxisExtent: MediaQuery.textScalerOf(context).scale(75),
-                ),
+                gridDelegate: gridDelegate,
                 itemCount: response!.length,
                 itemBuilder: (context, index) {
                   if (index == response.length - 1) {

@@ -1,4 +1,3 @@
-import 'package:PiliPlus/common/skeleton/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/custom_sliver_persistent_header_delegate.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
@@ -18,7 +17,7 @@ import 'package:PiliPlus/pages/video/member/controller.dart';
 import 'package:PiliPlus/services/account_service.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/grid.dart';
-import 'package:PiliPlus/utils/num_util.dart';
+import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -42,7 +41,8 @@ class HorizontalMemberPage extends StatefulWidget {
   State<HorizontalMemberPage> createState() => _HorizontalMemberPageState();
 }
 
-class _HorizontalMemberPageState extends State<HorizontalMemberPage> {
+class _HorizontalMemberPageState extends State<HorizontalMemberPage>
+    with GridMixin {
   late final HorizontalMemberPageController _controller;
   AccountService accountService = Get.find<AccountService>();
   dynamic _bvid;
@@ -96,9 +96,16 @@ class _HorizontalMemberPageState extends State<HorizontalMemberPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   _buildSliverHeader(theme),
-                  Obx(
-                    () =>
-                        _buildVideoList(theme, _controller.loadingState.value),
+                  SliverPadding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
+                    ),
+                    sliver: Obx(
+                      () => _buildVideoList(
+                        theme,
+                        _controller.loadingState.value,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -173,47 +180,32 @@ class _HorizontalMemberPageState extends State<HorizontalMemberPage> {
     LoadingState<List<SpaceArchiveItem>?> loadingState,
   ) {
     return switch (loadingState) {
-      Loading() => SliverGrid(
-        gridDelegate: Grid.videoCardHDelegate(context),
-        delegate: SliverChildBuilderDelegate(
-          childCount: 10,
-          (context, index) {
-            return const VideoCardHSkeleton();
-          },
-        ),
-      ),
+      Loading() => gridSkeleton,
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverPadding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.paddingOf(context).bottom + 80,
-                ),
-                sliver: SliverGrid(
-                  gridDelegate: Grid.videoCardHDelegate(context),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      if (index == response.length - 1 && _controller.hasNext) {
-                        _controller.onLoadMore();
-                      }
-                      final SpaceArchiveItem videoItem = response[index];
-                      return VideoCardHMemberVideo(
-                        videoItem: videoItem,
-                        bvid: _bvid,
-                        onTap: () {
-                          Get.back();
-                          widget.ugcIntroController.onChangeEpisode(
-                            BaseEpisodeItem(
-                              bvid: videoItem.bvid,
-                              cid: videoItem.cid,
-                              cover: videoItem.cover,
-                            ),
-                          );
-                        },
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1 && _controller.hasNext) {
+                    _controller.onLoadMore();
+                  }
+                  final SpaceArchiveItem videoItem = response[index];
+                  return VideoCardHMemberVideo(
+                    videoItem: videoItem,
+                    bvid: _bvid,
+                    onTap: () {
+                      Get.back();
+                      widget.ugcIntroController.onChangeEpisode(
+                        BaseEpisodeItem(
+                          bvid: videoItem.bvid,
+                          cid: videoItem.cid,
+                          cover: videoItem.cover,
+                        ),
                       );
                     },
-                    childCount: response!.length,
-                  ),
-                ),
+                  );
+                },
+                itemCount: response!.length,
               )
             : HttpError(onReload: _controller.onReload),
       Error(:var errMsg) => HttpError(
@@ -267,18 +259,18 @@ class _HorizontalMemberPageState extends State<HorizontalMemberPage> {
       Obx(
         () => Row(
           children: List.generate(5, (index) {
-            if (index % 2 == 0) {
+            if (index.isEven) {
               return _buildChildInfo(
                 theme: theme,
                 title: const ['粉丝', '关注', '获赞'][index ~/ 2],
                 num: index == 0
                     ? _controller.userStat['follower'] != null
-                          ? NumUtil.numFormat(_controller.userStat['follower'])
+                          ? NumUtils.numFormat(_controller.userStat['follower'])
                           : ''
                     : index == 2
                     ? _controller.userStat['following'] ?? ''
                     : _controller.userStat['likes'] != null
-                    ? NumUtil.numFormat(_controller.userStat['likes'])
+                    ? NumUtils.numFormat(_controller.userStat['likes'])
                     : '',
                 onTap: () {
                   if (index == 0) {

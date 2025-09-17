@@ -6,7 +6,7 @@ import 'package:PiliPlus/common/widgets/stat/stat.dart';
 import 'package:PiliPlus/models/common/stat_type.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/result.dart';
 import 'package:PiliPlus/models_new/video/video_tag/data.dart';
-import 'package:PiliPlus/pages/common/slide/common_collapse_slide_page.dart';
+import 'package:PiliPlus/pages/common/slide/common_slide_page.dart';
 import 'package:PiliPlus/pages/pgc_review/view.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
 import 'package:PiliPlus/utils/extension.dart';
@@ -14,7 +14,7 @@ import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart' hide TabBarView;
 import 'package:get/get.dart';
 
-class PgcIntroPanel extends CommonCollapseSlidePage {
+class PgcIntroPanel extends CommonSlidePage {
   final PgcInfoModel item;
   final List<VideoTagItem>? videoTags;
 
@@ -29,7 +29,8 @@ class PgcIntroPanel extends CommonCollapseSlidePage {
   State<PgcIntroPanel> createState() => _IntroDetailState();
 }
 
-class _IntroDetailState extends CommonCollapseSlidePageState<PgcIntroPanel> {
+class _IntroDetailState extends State<PgcIntroPanel>
+    with TickerProviderStateMixin, CommonSlideMixin {
   late final _tabController = TabController(length: 2, vsync: this);
   final _controller = ScrollController();
 
@@ -97,100 +98,98 @@ class _IntroDetailState extends CommonCollapseSlidePageState<PgcIntroPanel> {
     final TextStyle textStyle = TextStyle(
       color: theme.colorScheme.onSurfaceVariant,
     );
-    return SelectionArea(
-      child: ListView(
-        controller: _controller,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(
-          left: 14,
-          right: 14,
-          top: 14,
-          bottom: MediaQuery.paddingOf(context).bottom + 80,
-        ),
-        children: [
-          Text(
-            widget.item.title!,
-            style: const TextStyle(fontSize: 16),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            spacing: 6,
-            children: [
-              StatWidget(
-                type: StatType.play,
-                value: widget.item.stat!.view,
-              ),
-              StatWidget(
-                type: StatType.danmaku,
-                value: widget.item.stat!.danmaku,
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Text(
-                widget.item.areas!.first.name!,
-                style: smallTitle,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                widget.item.publish!.pubTimeShow!,
-                style: smallTitle,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                widget.item.newEp!.desc!,
-                style: smallTitle,
-              ),
-            ],
-          ),
-          if (widget.item.evaluate?.isNotEmpty == true) ...[
-            const SizedBox(height: 20),
-            Text(
-              '简介：',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.item.evaluate!,
-              style: textStyle,
-            ),
-          ],
-          if (widget.item.actors?.isNotEmpty == true) ...[
-            const SizedBox(height: 20),
-            Text(
-              '演职人员：',
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.item.actors!,
-              style: textStyle,
-            ),
-          ],
-          if (widget.videoTags?.isNotEmpty == true) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: widget.videoTags!
-                  .map(
-                    (item) => SearchText(
-                      fontSize: 13,
-                      text: item.tagName!,
-                      onTap: (tagName) => Get.toNamed(
-                        '/searchResult',
-                        parameters: {'keyword': tagName},
-                      ),
-                      onLongPress: Utils.copyText,
-                    ),
-                  )
-                  .toList(),
-            ),
-          ],
-        ],
+    return ListView(
+      controller: _controller,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.only(
+        left: 14,
+        right: 14,
+        top: 14,
+        bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
       ),
+      children: [
+        SelectableText(
+          widget.item.title!,
+          style: const TextStyle(fontSize: 16),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          spacing: 6,
+          children: [
+            StatWidget(
+              type: StatType.play,
+              value: widget.item.stat!.view,
+            ),
+            StatWidget(
+              type: StatType.danmaku,
+              value: widget.item.stat!.danmaku,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Text(
+              widget.item.areas!.first.name!,
+              style: smallTitle,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              widget.item.publish!.pubTimeShow!,
+              style: smallTitle,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              widget.item.newEp!.desc!,
+              style: smallTitle,
+            ),
+          ],
+        ),
+        if (widget.item.evaluate?.isNotEmpty == true) ...[
+          const SizedBox(height: 20),
+          Text(
+            '简介：',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 4),
+          SelectableText(
+            widget.item.evaluate!,
+            style: textStyle,
+          ),
+        ],
+        if (widget.item.actors?.isNotEmpty == true) ...[
+          const SizedBox(height: 20),
+          Text(
+            '演职人员：',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.item.actors!,
+            style: textStyle,
+          ),
+        ],
+        if (widget.videoTags?.isNotEmpty == true) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: widget.videoTags!
+                .map(
+                  (item) => SearchText(
+                    fontSize: 13,
+                    text: item.tagName!,
+                    onTap: (tagName) => Get.toNamed(
+                      '/searchResult',
+                      parameters: {'keyword': tagName},
+                    ),
+                    onLongPress: Utils.copyText,
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ],
     );
   }
 }

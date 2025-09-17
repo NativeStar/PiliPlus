@@ -9,19 +9,16 @@ import 'package:PiliPlus/pages/dynamics/widgets/author_panel.dart';
 import 'package:PiliPlus/pages/dynamics/widgets/dynamic_panel.dart';
 import 'package:PiliPlus/pages/dynamics_detail/controller.dart';
 import 'package:PiliPlus/pages/dynamics_repost/view.dart';
-import 'package:PiliPlus/utils/context_ext.dart';
-import 'package:PiliPlus/utils/feed_back.dart';
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/grid.dart';
-import 'package:PiliPlus/utils/num_util.dart';
+import 'package:PiliPlus/utils/num_utils.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
-import 'package:PiliPlus/utils/storage.dart';
-import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
 
-class DynamicDetailPage extends CommonDynPage {
+class DynamicDetailPage extends StatefulWidget {
   const DynamicDetailPage({super.key});
 
   @override
@@ -30,9 +27,9 @@ class DynamicDetailPage extends CommonDynPage {
 
 class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
   @override
-  final DynamicDetailController controller = Get.put(
-    DynamicDetailController(),
-    tag: Utils.generateRandomString(8),
+  final DynamicDetailController controller = Get.putOrFind(
+    DynamicDetailController.new,
+    tag: (Get.arguments['item'] as DynamicItemModel).idStr.toString(),
   );
 
   @override
@@ -44,9 +41,9 @@ class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.scrollController.hasClients) {
+      if (scrollController.hasClients) {
         controller.showTitle.value =
-            controller.scrollController.positions.first.pixels > 55;
+            scrollController.positions.first.pixels > 55;
       }
     });
   }
@@ -54,115 +51,117 @@ class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isPortrait = context.isPortrait;
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: AppBar(
-        title: Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: Obx(
-            () {
-              final showTitle = controller.showTitle.value;
-              return AnimatedOpacity(
-                opacity: showTitle ? 1 : 0,
-                duration: const Duration(milliseconds: 300),
-                child: IgnorePointer(
-                  ignoring: !showTitle,
-                  child: AuthorPanel(
-                    item: controller.dynItem,
-                    isDetail: true,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: isPortrait
-            ? null
-            : [
-                IconButton(
-                  tooltip: '页面比例调节',
-                  onPressed: () => showDialog(
-                    context: context,
-                    builder: (context) => Align(
-                      alignment: Alignment.topRight,
-                      child: Container(
-                        margin: const EdgeInsets.only(
-                          top: 56,
-                          right: 16,
-                        ),
-                        width: context.width / 4,
-                        height: 32,
-                        child: Builder(
-                          builder: (context) => Slider(
-                            min: 1,
-                            max: 100,
-                            value: controller.ratio.first,
-                            onChanged: (value) {
-                              if (value >= 10 && value <= 90) {
-                                value = value.toPrecision(2);
-                                controller.ratio
-                                  ..[0] = value
-                                  ..[1] = 100 - value;
-                                GStorage.setting.put(
-                                  SettingBoxKey.dynamicDetailRatio,
-                                  controller.ratio,
-                                );
-                                (context as Element).markNeedsBuild();
-                                setState(() {});
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  icon: Transform.rotate(
-                    angle: pi / 2,
-                    child: const Icon(Icons.splitscreen, size: 19),
-                  ),
-                ),
-                const SizedBox(width: 16),
-              ],
-      ),
-      body: SafeArea(
-        top: false,
-        bottom: false,
+      appBar: _buildAppBar(),
+      body: Padding(
+        padding: EdgeInsets.only(left: padding.left, right: padding.right),
         child: isPortrait
             ? refreshIndicator(
                 onRefresh: controller.onRefresh,
-                child: _buildBody(isPortrait, theme),
+                child: _buildBody(theme),
               )
-            : _buildBody(isPortrait, theme),
+            : _buildBody(theme),
       ),
     );
   }
 
-  Widget _buildBody(bool isPortrait, ThemeData theme) => Stack(
-    clipBehavior: Clip.none,
-    children: [
-      Builder(
-        builder: (context) {
-          double padding = max(context.width / 2 - Grid.smallCardWidth, 0);
-          if (isPortrait) {
-            return CustomScrollView(
-              controller: controller.scrollController,
+  PreferredSizeWidget _buildAppBar() => AppBar(
+    title: Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Obx(
+        () {
+          final showTitle = controller.showTitle.value;
+          return AnimatedOpacity(
+            opacity: showTitle ? 1 : 0,
+            duration: const Duration(milliseconds: 300),
+            child: IgnorePointer(
+              ignoring: !showTitle,
+              child: AuthorPanel(
+                item: controller.dynItem,
+                isDetail: true,
+              ),
+            ),
+          );
+        },
+      ),
+    ),
+    actions: isPortrait
+        ? null
+        : [
+            ratioWidget(maxWidth),
+            const SizedBox(width: 16),
+          ],
+  );
+
+  Widget _buildBody(ThemeData theme) {
+    double padding = max(maxWidth / 2 - Grid.smallCardWidth, 0);
+    Widget child;
+    if (isPortrait) {
+      child = Padding(
+        padding: EdgeInsets.symmetric(horizontal: padding),
+        child: CustomScrollView(
+          controller: scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: DynamicPanel(
+                item: controller.dynItem,
+                isDetail: true,
+                maxWidth: maxWidth - this.padding.horizontal - 2 * padding,
+                isDetailPortraitW: isPortrait,
+              ),
+            ),
+            buildReplyHeader(theme),
+            Obx(() => replyList(theme, controller.loadingState.value)),
+          ],
+        ),
+      );
+    } else {
+      padding = padding / 4;
+      final flex = controller.ratio[0].toInt();
+      final flex1 = controller.ratio[1].toInt();
+      child = Row(
+        children: [
+          Expanded(
+            flex: flex,
+            child: CustomScrollView(
+              controller: scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverPadding(
-                  padding: EdgeInsets.symmetric(horizontal: padding),
-                  sliver: SliverMainAxisGroup(
+                  padding: EdgeInsets.only(
+                    left: padding,
+                    bottom: this.padding.bottom + 100,
+                  ),
+                  sliver: SliverToBoxAdapter(
+                    child: DynamicPanel(
+                      item: controller.dynItem,
+                      isDetail: true,
+                      maxWidth:
+                          (maxWidth - this.padding.horizontal) *
+                              (flex / (flex + flex1)) -
+                          padding,
+                      isDetailPortraitW: isPortrait,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: flex1,
+            child: Padding(
+              padding: EdgeInsets.only(right: padding),
+              child: Scaffold(
+                backgroundColor: Colors.transparent,
+                resizeToAvoidBottomInset: false,
+                body: refreshIndicator(
+                  onRefresh: controller.onRefresh,
+                  child: CustomScrollView(
+                    controller: scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     slivers: [
-                      SliverToBoxAdapter(
-                        child: LayoutBuilder(
-                          builder: (_, constrains) => DynamicPanel(
-                            item: controller.dynItem,
-                            isDetail: true,
-                            callback: imageCallback,
-                            maxWidth: constrains.maxWidth,
-                          ),
-                        ),
-                      ),
                       buildReplyHeader(theme),
                       Obx(
                         () => replyList(theme, controller.loadingState.value),
@@ -170,73 +169,20 @@ class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
                     ],
                   ),
                 ),
-              ],
-            );
-          } else {
-            return Row(
-              children: [
-                Expanded(
-                  flex: controller.ratio[0].toInt(),
-                  child: CustomScrollView(
-                    controller: controller.scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverPadding(
-                        padding: EdgeInsets.only(
-                          left: padding / 4,
-                          bottom: MediaQuery.paddingOf(context).bottom + 80,
-                        ),
-                        sliver: SliverToBoxAdapter(
-                          child: LayoutBuilder(
-                            builder: (_, constraints) => DynamicPanel(
-                              item: controller.dynItem,
-                              isDetail: true,
-                              callback: imageCallback,
-                              maxWidth: constraints.maxWidth,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  flex: controller.ratio[1].toInt(),
-                  child: Scaffold(
-                    key: scaffoldKey,
-                    backgroundColor: Colors.transparent,
-                    body: refreshIndicator(
-                      onRefresh: controller.onRefresh,
-                      child: CustomScrollView(
-                        controller: controller.scrollController,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          SliverPadding(
-                            padding: EdgeInsets.only(right: padding / 4),
-                            sliver: buildReplyHeader(theme),
-                          ),
-                          SliverPadding(
-                            padding: EdgeInsets.only(right: padding / 4),
-                            sliver: Obx(
-                              () => replyList(
-                                theme,
-                                controller.loadingState.value,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
-        },
-      ),
-      _buildBottom(theme),
-    ],
-  );
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        _buildBottom(theme),
+      ],
+    );
+  }
 
   Widget _buildBottom(ThemeData theme) {
     return Positioned(
@@ -244,33 +190,18 @@ class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
       right: 0,
       bottom: 0,
       child: SlideTransition(
-        position: controller.fabAnim,
+        position: fabAnim,
         child: Builder(
           builder: (context) {
-            Widget button() => FloatingActionButton(
-              heroTag: null,
-              onPressed: () {
-                feedBack();
-                controller.onReply(
-                  context,
-                  oid: controller.oid,
-                  replyType: controller.replyType,
-                );
-              },
-              tooltip: '评论动态',
-              child: const Icon(Icons.reply),
-            );
-
-            final bottom = MediaQuery.paddingOf(context).bottom;
             if (!controller.showDynActionBar) {
               return Align(
                 alignment: Alignment.bottomRight,
                 child: Padding(
                   padding: EdgeInsets.only(
                     right: 14,
-                    bottom: bottom + 14,
+                    bottom: padding.bottom + 14,
                   ),
-                  child: button(),
+                  child: replyButton,
                 ),
               );
             }
@@ -301,7 +232,7 @@ class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
                 ),
                 style: btnStyle,
                 label: Text(
-                  stat?.count != null ? NumUtil.numFormat(stat!.count) : text,
+                  stat?.count != null ? NumUtils.numFormat(stat!.count) : text,
                   style: TextStyle(color: color),
                 ),
               );
@@ -313,7 +244,7 @@ class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
               children: [
                 Padding(
                   padding: const EdgeInsets.only(right: 14, bottom: 14),
-                  child: button(),
+                  child: replyButton,
                 ),
                 Container(
                   decoration: BoxDecoration(
@@ -326,7 +257,7 @@ class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
                       ),
                     ),
                   ),
-                  padding: EdgeInsets.only(bottom: bottom),
+                  padding: EdgeInsets.only(bottom: padding.bottom),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -349,8 +280,8 @@ class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
                                       int count = forward.count ?? 0;
                                       forward.count = count + 1;
                                       if (btnContext.mounted) {
-                                        (btnContext as Element?)
-                                            ?.markNeedsBuild();
+                                        (btnContext as Element)
+                                            .markNeedsBuild();
                                       }
                                     }
                                   },
@@ -382,7 +313,7 @@ class _DynamicDetailPageState extends CommonDynPageState<DynamicDetailPage> {
                                 controller.dynItem,
                                 () {
                                   if (context.mounted) {
-                                    (context as Element?)?.markNeedsBuild();
+                                    (context as Element).markNeedsBuild();
                                   }
                                 },
                               ),

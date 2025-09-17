@@ -44,7 +44,7 @@ class _MemberFavoriteState extends State<MemberFavorite>
         slivers: [
           SliverPadding(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.paddingOf(context).bottom + 80,
+              bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
             ),
             sliver: Obx(
               () => _buildBody(theme, _controller.loadingState.value),
@@ -59,14 +59,10 @@ class _MemberFavoriteState extends State<MemberFavorite>
     return switch (loadingState) {
       Loading() => SliverPadding(
         padding: const EdgeInsets.only(top: 7),
-        sliver: SliverGrid(
+        sliver: SliverGrid.builder(
           gridDelegate: Grid.videoCardHDelegate(context),
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              return const VideoCardHSkeleton();
-            },
-            childCount: 10,
-          ),
+          itemBuilder: (context, index) => const VideoCardHSkeleton(),
+          itemCount: 10,
         ),
       ),
       Success(:var response) =>
@@ -85,9 +81,7 @@ class _MemberFavoriteState extends State<MemberFavorite>
                   ),
                 ],
               )
-            : HttpError(
-                onReload: _controller.onReload,
-              ),
+            : HttpError(onReload: _controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: _controller.onReload,

@@ -2,7 +2,7 @@ import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/fav/fav_folder/list.dart';
 import 'package:PiliPlus/pages/common/common_intro_controller.dart';
-import 'package:PiliPlus/utils/fav_util.dart';
+import 'package:PiliPlus/utils/fav_utils.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -64,13 +64,13 @@ class _FavPanelState extends State<FavPanel> {
                 return ListTile(
                   onTap: onTap,
                   dense: true,
-                  leading: FavUtil.isPublicFav(item.attr)
+                  leading: FavUtils.isPublicFav(item.attr)
                       ? const Icon(Icons.folder_outlined)
                       : const Icon(Icons.lock_outline),
                   minLeadingWidth: 0,
                   title: Text(item.title),
                   subtitle: Text(
-                    '${item.mediaCount}个内容 . ${FavUtil.isPublicFavText(item.attr)}',
+                    '${item.mediaCount}个内容 . ${FavUtils.isPublicFavText(item.attr)}',
                   ),
                   trailing: Transform.scale(
                     scale: 0.9,
@@ -95,7 +95,7 @@ class _FavPanelState extends State<FavPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = Theme.of(context).colorScheme;
     return Column(
       children: [
         AppBar(
@@ -117,7 +117,7 @@ class _FavPanelState extends State<FavPanel> {
               }),
               icon: Icon(
                 Icons.add,
-                color: theme.colorScheme.primary,
+                color: theme.primary,
               ),
               label: const Text('新建收藏夹'),
               style: TextButton.styleFrom(
@@ -134,49 +134,35 @@ class _FavPanelState extends State<FavPanel> {
         Expanded(child: _buildBody),
         Divider(
           height: 1,
-          color: theme.disabledColor.withValues(alpha: 0.08),
+          color: theme.outline.withValues(alpha: 0.1),
         ),
         Padding(
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
             top: 12,
-            bottom: MediaQuery.paddingOf(context).bottom + 12,
+            bottom: MediaQuery.viewPaddingOf(context).bottom + 12,
           ),
           child: Row(
+            spacing: 25,
             mainAxisAlignment: MainAxisAlignment.end,
-            children: <Widget>[
-              TextButton(
+            children: [
+              FilledButton.tonal(
                 onPressed: Get.back,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  visualDensity: const VisualDensity(
-                    horizontal: -1,
-                    vertical: -2,
-                  ),
-                  foregroundColor: theme.colorScheme.outline,
-                  backgroundColor: theme.colorScheme.onInverseSurface,
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: theme.outline,
+                  backgroundColor: theme.onInverseSurface,
                 ),
                 child: const Text('取消'),
               ),
-              const SizedBox(width: 25),
               FilledButton.tonal(
                 onPressed: () {
                   feedBack();
                   widget.ctr.actionFavVideo();
                 },
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  visualDensity: const VisualDensity(
-                    horizontal: -1,
-                    vertical: -2,
-                  ),
+                  visualDensity: VisualDensity.compact,
                 ),
                 child: const Text('完成'),
               ),

@@ -11,9 +11,7 @@ import 'package:PiliPlus/models_new/msg/im_user_infos/datum.dart';
 import 'package:PiliPlus/models_new/msg/msg_dnd/uid_setting.dart';
 import 'package:PiliPlus/models_new/msg/session_ss/data.dart';
 import 'package:PiliPlus/utils/accounts.dart';
-import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:fixnum/fixnum.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
@@ -129,7 +127,6 @@ class WhisperLinkSettingController extends GetxController {
         sessionSs
           ..value.data.followStatus = null
           ..refresh();
-        Pref.removeBlackMid(talkerUid);
       } else {
         SmartDialog.showToast(res['msg']);
       }
@@ -148,7 +145,6 @@ class WhisperLinkSettingController extends GetxController {
             sessionSs
               ..value.data.followStatus = 128
               ..refresh();
-            Pref.setBlackMid(talkerUid);
           } else {
             SmartDialog.showToast(res['msg']);
           }
@@ -157,20 +153,9 @@ class WhisperLinkSettingController extends GetxController {
     }
   }
 
-  void report() {
-    showDialog(
-      context: Get.context!,
-      builder: (context) => AlertDialog(
-        clipBehavior: Clip.hardEdge,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 16,
-        ),
-        content: MemberReportPanel(
-          name: userState.value.dataOrNull?.firstOrNull?.name ?? '',
-          mid: talkerUid,
-        ),
-      ),
-    );
-  }
+  void report() => showMemberReportDialog(
+    Get.context!,
+    name: userState.value.dataOrNull?.firstOrNull?.name,
+    mid: talkerUid,
+  );
 }

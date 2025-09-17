@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/http/danmaku.dart';
 import 'package:PiliPlus/main.dart';
 import 'package:PiliPlus/models/common/publish_panel_type.dart';
@@ -86,50 +87,48 @@ class _SendDanmakuPanelState extends CommonTextPubPageState<SendDanmakuPanel> {
     super.dispose();
   }
 
-  Expanded get _buildColorPanel => Expanded(
+  Widget get _buildColorPanel => Expanded(
     child: Obx(
-      () => LayoutBuilder(
-        key: ValueKey(_color.value),
-        builder: (context, constraints) {
-          final int crossAxisCount = (constraints.maxWidth / 40).toInt();
-          final bool isCustomColor = !_colorList.contains(_color.value);
-          final int length = _colorList.length + (isCustomColor ? 1 : 0) + 1;
-          return GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 4,
-              mainAxisSpacing: 4,
-            ),
-            itemCount: length,
-            itemBuilder: (context, index) {
-              if (index == length - 1) {
-                return GestureDetector(
-                  onTap: _showColorPicker,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: themeData.colorScheme.secondaryContainer,
-                      borderRadius: const BorderRadius.all(Radius.circular(8)),
-                    ),
-                    alignment: Alignment.center,
-                    margin: const EdgeInsets.all(2),
-                    child: Icon(
-                      size: 22,
-                      Icons.edit,
-                      color: themeData.colorScheme.onSecondaryContainer,
+      () {
+        final bool isCustomColor = !_colorList.contains(_color.value);
+        final int length = _colorList.length + (isCustomColor ? 1 : 0) + 1;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 42,
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 4,
+          ),
+          itemCount: length,
+          itemBuilder: (context, index) {
+            if (index == length - 1) {
+              return GestureDetector(
+                onTap: _showColorPicker,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: themeData.colorScheme.secondaryContainer,
+                    borderRadius: const BorderRadius.all(
+                      Radius.circular(8),
                     ),
                   ),
-                );
-              } else if (index == length - 2 && isCustomColor) {
-                return _buildColorItem(_color.value);
-              }
-              return _buildColorItem(_colorList[index]);
-            },
-          );
-        },
-      ),
+                  alignment: Alignment.center,
+                  margin: const EdgeInsets.all(2),
+                  child: Icon(
+                    size: 22,
+                    Icons.edit,
+                    color: themeData.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              );
+            } else if (index == length - 2 && isCustomColor) {
+              return _buildColorItem(_color.value);
+            }
+            return _buildColorItem(_colorList[index]);
+          },
+        );
+      },
     ),
   );
 
@@ -145,17 +144,13 @@ class _SendDanmakuPanelState extends CommonTextPubPageState<SendDanmakuPanel> {
 
   @override
   Widget build(BuildContext context) {
-    Widget child = SafeArea(
-      bottom: false,
+    Widget child = ViewSafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
           constraints: const BoxConstraints(maxWidth: 450),
           decoration: BoxDecoration(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(12),
-              topRight: Radius.circular(12),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             color: themeData.colorScheme.surface,
           ),
           child: Column(
@@ -216,7 +211,7 @@ class _SendDanmakuPanelState extends CommonTextPubPageState<SendDanmakuPanel> {
               _buildColorPanel,
             ],
           ),
-          SizedBox(height: 12 + MediaQuery.paddingOf(context).bottom),
+          SizedBox(height: 12 + MediaQuery.viewPaddingOf(context).bottom),
         ],
       ),
     ),
@@ -334,23 +329,24 @@ class _SendDanmakuPanelState extends CommonTextPubPageState<SendDanmakuPanel> {
       child: Row(
         children: [
           Obx(
-            () => iconButton(
-              context: context,
-              tooltip: '弹幕样式',
-              onPressed: () {
-                updatePanelType(
-                  panelType.value == PanelType.keyboard
-                      ? PanelType.emoji
-                      : PanelType.keyboard,
-                );
-              },
-              bgColor: Colors.transparent,
-              iconSize: 24,
-              icon: Icons.text_format,
-              iconColor: panelType.value == PanelType.emoji
-                  ? themeData.colorScheme.primary
-                  : themeData.colorScheme.onSurfaceVariant,
-            ),
+            () {
+              final isEmoji = panelType.value == PanelType.emoji;
+              return iconButton(
+                context: context,
+                tooltip: '弹幕样式',
+                onPressed: () {
+                  updatePanelType(
+                    isEmoji ? PanelType.keyboard : PanelType.emoji,
+                  );
+                },
+                bgColor: Colors.transparent,
+                iconSize: 24,
+                icon: Icons.text_format,
+                iconColor: isEmoji
+                    ? themeData.colorScheme.primary
+                    : themeData.colorScheme.onSurfaceVariant,
+              );
+            },
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -435,7 +431,6 @@ class _SendDanmakuPanelState extends CommonTextPubPageState<SendDanmakuPanel> {
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
         title: const Text('Color Picker'),
         content: SlideColorPicker(
-          showResetBtn: false,
           color: _color.value,
           callback: (Color? color) {
             if (color != null) {
@@ -459,7 +454,7 @@ class _SendDanmakuPanelState extends CommonTextPubPageState<SendDanmakuPanel> {
       msg: editController.text,
       mode: _mode.value,
       fontsize: _fontsize.value,
-      color: isColorful ? null : _color.value.value & 0xFFFFFF,
+      color: isColorful ? null : _color.value.toARGB32() & 0xFFFFFF,
       colorful: isColorful,
     );
     SmartDialog.dismiss();

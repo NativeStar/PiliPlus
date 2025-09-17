@@ -17,7 +17,6 @@ import 'package:PiliPlus/pages/member_like_arc/view.dart';
 import 'package:PiliPlus/pages/member_pgc/widgets/pgc_card_v_member_pgc.dart';
 import 'package:PiliPlus/utils/context_ext.dart';
 import 'package:PiliPlus/utils/grid.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
@@ -32,7 +31,7 @@ class MemberHome extends StatefulWidget {
 }
 
 class _MemberHomeState extends State<MemberHome>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, GridMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -44,8 +43,31 @@ class _MemberHomeState extends State<MemberHome>
     return _buildBody(_ctr.loadingState.value);
   }
 
+  late final gridDelegateV = SliverGridDelegateWithExtentAndRatio(
+    mainAxisSpacing: StyleString.cardSpace,
+    crossAxisSpacing: StyleString.cardSpace,
+    maxCrossAxisExtent: Grid.smallCardWidth,
+    childAspectRatio: StyleString.aspectRatio,
+    mainAxisExtent: MediaQuery.textScalerOf(context).scale(55),
+  );
+
+  late final gridDelegateAudio = SliverGridDelegateWithExtentAndRatio(
+    mainAxisSpacing: 2,
+    maxCrossAxisExtent: Grid.smallCardWidth * 2,
+    childAspectRatio: StyleString.aspectRatio * 2.6,
+    minHeight: MediaQuery.textScalerOf(context).scale(90),
+  );
+
+  late final gridDelegatePgc = SliverGridDelegateWithExtentAndRatio(
+    mainAxisSpacing: StyleString.cardSpace,
+    crossAxisSpacing: StyleString.cardSpace,
+    maxCrossAxisExtent: Grid.smallCardWidth * 0.6,
+    childAspectRatio: 0.75,
+    mainAxisExtent: MediaQuery.textScalerOf(context).scale(52),
+  );
+
   Widget _buildBody(LoadingState<SpaceData?> loadingState) {
-    final isVertical = context.isPortrait;
+    final isVertical = context.width < 600;
     final setting = _ctr.spaceSetting;
     final isOwner = setting != null;
     final color = Theme.of(context).colorScheme.outline;
@@ -67,26 +89,16 @@ class _MemberHomeState extends State<MemberHome>
                       padding: const EdgeInsets.symmetric(
                         horizontal: StyleString.safeSpace,
                       ),
-                      sliver: SliverGrid(
-                        gridDelegate: SliverGridDelegateWithExtentAndRatio(
-                          mainAxisSpacing: StyleString.cardSpace,
-                          crossAxisSpacing: StyleString.cardSpace,
-                          maxCrossAxisExtent: Grid.smallCardWidth,
-                          childAspectRatio: StyleString.aspectRatio,
-                          mainAxisExtent: MediaQuery.textScalerOf(
-                            context,
-                          ).scale(55),
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            return VideoCardVMemberHome(
-                              videoItem: res.archive!.item![index],
-                            );
-                          },
-                          childCount: min(
-                            isVertical ? 4 : 8,
-                            res.archive!.item!.length,
-                          ),
+                      sliver: SliverGrid.builder(
+                        gridDelegate: gridDelegateV,
+                        itemBuilder: (context, index) {
+                          return VideoCardVMemberHome(
+                            videoItem: res.archive!.item![index],
+                          );
+                        },
+                        itemCount: min(
+                          isVertical ? 4 : 8,
+                          res.archive!.item!.length,
                         ),
                       ),
                     ),
@@ -120,26 +132,16 @@ class _MemberHomeState extends State<MemberHome>
                       padding: const EdgeInsets.symmetric(
                         horizontal: StyleString.safeSpace,
                       ),
-                      sliver: SliverGrid(
-                        gridDelegate: SliverGridDelegateWithExtentAndRatio(
-                          mainAxisSpacing: StyleString.cardSpace,
-                          crossAxisSpacing: StyleString.cardSpace,
-                          maxCrossAxisExtent: Grid.smallCardWidth,
-                          childAspectRatio: StyleString.aspectRatio,
-                          mainAxisExtent: MediaQuery.textScalerOf(
-                            context,
-                          ).scale(55),
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            return VideoCardVMemberHome(
-                              videoItem: res.coinArchive!.item![index],
-                            );
-                          },
-                          childCount: min(
-                            isVertical ? 2 : 4,
-                            res.coinArchive!.item!.length,
-                          ),
+                      sliver: SliverGrid.builder(
+                        gridDelegate: gridDelegateV,
+                        itemBuilder: (context, index) {
+                          return VideoCardVMemberHome(
+                            videoItem: res.coinArchive!.item![index],
+                          );
+                        },
+                        itemCount: min(
+                          isVertical ? 2 : 4,
+                          res.coinArchive!.item!.length,
                         ),
                       ),
                     ),
@@ -156,26 +158,16 @@ class _MemberHomeState extends State<MemberHome>
                       padding: const EdgeInsets.symmetric(
                         horizontal: StyleString.safeSpace,
                       ),
-                      sliver: SliverGrid(
-                        gridDelegate: SliverGridDelegateWithExtentAndRatio(
-                          mainAxisSpacing: StyleString.cardSpace,
-                          crossAxisSpacing: StyleString.cardSpace,
-                          maxCrossAxisExtent: Grid.smallCardWidth,
-                          childAspectRatio: StyleString.aspectRatio,
-                          mainAxisExtent: MediaQuery.textScalerOf(
-                            context,
-                          ).scale(55),
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            return VideoCardVMemberHome(
-                              videoItem: res.likeArchive!.item![index],
-                            );
-                          },
-                          childCount: min(
-                            isVertical ? 2 : 4,
-                            res.likeArchive!.item!.length,
-                          ),
+                      sliver: SliverGrid.builder(
+                        gridDelegate: gridDelegateV,
+                        itemBuilder: (context, index) {
+                          return VideoCardVMemberHome(
+                            videoItem: res.likeArchive!.item![index],
+                          );
+                        },
+                        itemCount: min(
+                          isVertical ? 2 : 4,
+                          res.likeArchive!.item!.length,
                         ),
                       ),
                     ),
@@ -188,16 +180,14 @@ class _MemberHomeState extends State<MemberHome>
                       param1: 'opus',
                       count: res.article!.count!,
                     ),
-                    SliverGrid(
-                      gridDelegate: Grid.videoCardHDelegate(context),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          return MemberArticleItem(
-                            item: res.article!.item![index],
-                          );
-                        },
-                        childCount: isVertical ? 1 : res.article!.item!.length,
-                      ),
+                    SliverGrid.builder(
+                      gridDelegate: gridDelegate,
+                      itemBuilder: (context, index) {
+                        return MemberArticleItem(
+                          item: res.article!.item![index],
+                        );
+                      },
+                      itemCount: isVertical ? 1 : res.article!.item!.length,
                     ),
                   ],
                   if (res.audios?.item?.isNotEmpty == true) ...[
@@ -208,21 +198,14 @@ class _MemberHomeState extends State<MemberHome>
                       param1: 'audio',
                       count: res.audios!.count!,
                     ),
-                    SliverGrid(
-                      gridDelegate: SliverGridDelegateWithExtentAndRatio(
-                        mainAxisSpacing: 2,
-                        maxCrossAxisExtent: Grid.smallCardWidth * 2,
-                        childAspectRatio: StyleString.aspectRatio * 2.6,
-                        minHeight: MediaQuery.textScalerOf(context).scale(90),
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          return MemberAudioItem(
-                            item: res.audios!.item![index],
-                          );
-                        },
-                        childCount: isVertical ? 1 : min(2, res.audios!.count!),
-                      ),
+                    SliverGrid.builder(
+                      gridDelegate: gridDelegateAudio,
+                      itemBuilder: (context, index) {
+                        return MemberAudioItem(
+                          item: res.audios!.item![index],
+                        );
+                      },
+                      itemCount: isVertical ? 1 : min(2, res.audios!.count!),
                     ),
                   ],
                   if (res.comic?.item?.isNotEmpty == true) ...[
@@ -233,14 +216,12 @@ class _MemberHomeState extends State<MemberHome>
                       param1: 'comic',
                       count: res.comic!.count!,
                     ),
-                    SliverGrid(
-                      gridDelegate: Grid.videoCardHDelegate(context),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          return MemberComicItem(item: res.comic!.item![index]);
-                        },
-                        childCount: isVertical ? 1 : min(2, res.comic!.count!),
-                      ),
+                    SliverGrid.builder(
+                      gridDelegate: gridDelegate,
+                      itemBuilder: (context, index) {
+                        return MemberComicItem(item: res.comic!.item![index]);
+                      },
+                      itemCount: isVertical ? 1 : min(2, res.comic!.count!),
                     ),
                   ],
                   if (res.season?.item?.isNotEmpty == true) ...[
@@ -255,33 +236,23 @@ class _MemberHomeState extends State<MemberHome>
                       padding: const EdgeInsets.symmetric(
                         horizontal: StyleString.safeSpace,
                       ),
-                      sliver: SliverGrid(
-                        gridDelegate: SliverGridDelegateWithExtentAndRatio(
-                          mainAxisSpacing: StyleString.cardSpace,
-                          crossAxisSpacing: StyleString.cardSpace,
-                          maxCrossAxisExtent: Grid.smallCardWidth / 3 * 2,
-                          childAspectRatio: 0.75,
-                          mainAxisExtent: MediaQuery.textScalerOf(
-                            context,
-                          ).scale(52),
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            return PgcCardVMemberPgc(
-                              item: res.season!.item![index],
-                            );
-                          },
-                          childCount: min(
-                            isVertical ? 3 : 6,
-                            res.season!.item!.length,
-                          ),
+                      sliver: SliverGrid.builder(
+                        gridDelegate: gridDelegatePgc,
+                        itemBuilder: (context, index) {
+                          return PgcCardVMemberPgc(
+                            item: res.season!.item![index],
+                          );
+                        },
+                        itemCount: min(
+                          isVertical ? 3 : 6,
+                          res.season!.item!.length,
                         ),
                       ),
                     ),
                   ],
                   SliverToBoxAdapter(
                     child: SizedBox(
-                      height: 80 + MediaQuery.paddingOf(context).bottom,
+                      height: 100 + MediaQuery.viewPaddingOf(context).bottom,
                     ),
                   ),
                 ],
@@ -357,10 +328,10 @@ class _MemberHomeState extends State<MemberHome>
                         if (contributeCtr.tabController?.index != index1) {
                           contributeCtr.tabController?.index = index1;
                         }
-                        if (kDebugMode) debugPrint('initialized');
+                        // if (kDebugMode) debugPrint('initialized');
                       } catch (e) {
                         _ctr.contributeInitialIndex.value = index1;
-                        if (kDebugMode) debugPrint('not initialized');
+                        // if (kDebugMode) debugPrint('not initialized');
                       }
                     }
                   }
@@ -398,7 +369,7 @@ class _MemberHomeState extends State<MemberHome>
                       style: TextStyle(color: color),
                     ),
                     WidgetSpan(
-                      alignment: PlaceholderAlignment.top,
+                      alignment: PlaceholderAlignment.middle,
                       child: Icon(
                         Icons.arrow_forward_ios,
                         size: 14,

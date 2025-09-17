@@ -6,7 +6,7 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/models_new/blacklist/list.dart';
 import 'package:PiliPlus/pages/blacklist/controller.dart';
-import 'package:PiliPlus/utils/date_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/global_data.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:flutter/material.dart';
@@ -39,6 +39,7 @@ class _BlackListPageState extends State<BlackListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Obx(
           () => Text(
@@ -54,7 +55,7 @@ class _BlackListPageState extends State<BlackListPage> {
           slivers: [
             SliverPadding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.paddingOf(context).bottom + 80,
+                bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
               ),
               sliver: Obx(
                 () => _buildBody(_blackListController.loadingState.value),
@@ -71,9 +72,7 @@ class _BlackListPageState extends State<BlackListPage> {
     return switch (loadingState) {
       Loading() => SliverList.builder(
         itemCount: 12,
-        itemBuilder: (context, index) {
-          return const MsgFeedTopSkeleton();
-        },
+        itemBuilder: (context, index) => const MsgFeedTopSkeleton(),
       ),
       Success(:var response) =>
         response?.isNotEmpty == true
@@ -99,7 +98,7 @@ class _BlackListPageState extends State<BlackListPage> {
                       style: const TextStyle(fontSize: 14),
                     ),
                     subtitle: Text(
-                      '添加时间: ${DateUtil.format(item.mtime, format: DateUtil.longFormatDs)}',
+                      '添加时间: ${DateFormatUtils.format(item.mtime, format: DateFormatUtils.longFormatDs)}',
                       maxLines: 1,
                       style: style,
                       overflow: TextOverflow.ellipsis,

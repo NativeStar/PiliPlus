@@ -1,6 +1,3 @@
-import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
-    show MainListReply, ReplyInfo;
-import 'package:PiliPlus/grpc/reply.dart';
 import 'package:PiliPlus/http/dynamics.dart';
 import 'package:PiliPlus/http/fav.dart';
 import 'package:PiliPlus/http/loading_state.dart';
@@ -13,13 +10,14 @@ import 'package:PiliPlus/models_new/article/article_info/data.dart';
 import 'package:PiliPlus/models_new/article/article_view/data.dart';
 import 'package:PiliPlus/pages/common/dyn/common_dyn_controller.dart';
 import 'package:PiliPlus/utils/accounts.dart';
+import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/url_utils.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
 
-class ArticleController extends CommonDynController<MainListReply> {
+class ArticleController extends CommonDynController {
   late String id;
   late String type;
 
@@ -50,8 +48,9 @@ class ArticleController extends CommonDynController<MainListReply> {
   @override
   void onInit() {
     super.onInit();
-    id = Get.parameters['id']!;
-    type = Get.parameters['type']!;
+    final params = Get.parameters;
+    id = params['id']!;
+    type = params['type']!;
 
     // to opus
     if (type == 'read') {
@@ -59,8 +58,12 @@ class ArticleController extends CommonDynController<MainListReply> {
         url,
       ) {
         if (url != null) {
-          id = url.split('/').last;
-          type = 'opus';
+          final opusId = PiliScheme.uriDigitRegExp.firstMatch(url)?.group(1);
+          if (opusId != null) {
+            id = opusId;
+            type = 'opus';
+          }
+          Get.putOrFind(() => this, tag: type + id);
         }
         init();
       });
@@ -103,8 +106,10 @@ class ArticleController extends CommonDynController<MainListReply> {
         ..author ??= opusData.modules.moduleAuthor
         ..title ??= opusData.modules.moduleTag?.text;
       return true;
+    } else {
+      loadingState.value = res as Error;
+      return false;
     }
-    return false;
   }
 
   Future<bool> queryRead(int cvid) async {
@@ -120,8 +125,10 @@ class ArticleController extends CommonDynController<MainListReply> {
         getArticleInfo();
       }
       return true;
+    } else {
+      loadingState.value = res as Error;
+      return false;
     }
-    return false;
   }
 
   // stats
@@ -170,20 +177,6 @@ class ArticleController extends CommonDynController<MainListReply> {
     }
   }
 
-  @override
-  List<ReplyInfo>? getDataList(MainListReply response) {
-    return response.replies;
-  }
-
-  @override
-  Future<LoadingState<MainListReply>> customGetData() => ReplyGrpc.mainList(
-    type: commentType,
-    oid: commentId,
-    mode: mode.value,
-    cursorNext: cursorNext,
-    offset: paginationReply?.nextOffset,
-  );
-
   Future<void> onFav() async {
     final favorite = stats.value?.favorite;
     bool isFav = favorite?.status == true;
@@ -225,6 +218,14 @@ class ArticleController extends CommonDynController<MainListReply> {
     } else {
       SmartDialog.showToast(res['msg']);
     }
+  }
+
+  @override
+  Future<void> onReload() {
+    if (!isLoaded.value) {
+      return Future.value();
+    }
+    return super.onReload();
   }
 }
 

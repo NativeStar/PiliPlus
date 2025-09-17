@@ -13,6 +13,7 @@ import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -41,6 +42,20 @@ List<SettingsModel> get playSettings => [
     leading: Icon(Icons.motion_photos_auto_outlined),
     setKey: SettingBoxKey.autoPlayEnable,
     defaultVal: false,
+  ),
+  const SettingsModel(
+    settingsType: SettingsType.sw1tch,
+    title: '全屏显示锁定按钮',
+    leading: Icon(Icons.lock_outline),
+    setKey: SettingBoxKey.showFsLockBtn,
+    defaultVal: true,
+  ),
+  const SettingsModel(
+    settingsType: SettingsType.sw1tch,
+    title: '全屏显示截图按钮',
+    leading: Icon(Icons.photo_camera_outlined),
+    setKey: SettingBoxKey.showFsScreenshotBtn,
+    defaultVal: true,
   ),
   const SettingsModel(
     settingsType: SettingsType.sw1tch,
@@ -117,6 +132,13 @@ List<SettingsModel> get playSettings => [
   ),
   const SettingsModel(
     settingsType: SettingsType.sw1tch,
+    title: '显示 SuperChat',
+    leading: Icon(Icons.live_tv),
+    setKey: SettingBoxKey.showSuperChat,
+    defaultVal: true,
+  ),
+  const SettingsModel(
+    settingsType: SettingsType.sw1tch,
     title: '竖屏扩大展示',
     subtitle: '小屏竖屏视频宽高比由16:9扩大至1:1（不支持收起）；横屏适配时，扩大至9:16',
     leading: Icon(Icons.expand_outlined),
@@ -173,7 +195,7 @@ List<SettingsModel> get playSettings => [
       setKey: SettingBoxKey.autoPiP,
       defaultVal: false,
       onChanged: (val) {
-        if (val && !videoPlayerServiceHandler.enableBackgroundPlay) {
+        if (val && !videoPlayerServiceHandler!.enableBackgroundPlay) {
           SmartDialog.showToast('建议开启后台音频服务');
         }
       },
@@ -191,7 +213,7 @@ List<SettingsModel> get playSettings => [
     settingsType: SettingsType.sw1tch,
     title: '全屏手势反向',
     subtitle: '默认播放器中部向上滑动进入全屏，向下退出\n开启后向下全屏，向上退出',
-    leading: Icon(Icons.swap_vert_outlined),
+    leading: Icon(Icons.swap_vert),
     setKey: SettingBoxKey.fullScreenGestureReverse,
     defaultVal: false,
   ),
@@ -260,17 +282,18 @@ List<SettingsModel> get playSettings => [
       }
     },
   ),
-  SettingsModel(
-    settingsType: SettingsType.sw1tch,
-    title: '后台音频服务',
-    subtitle: '避免画中画没有播放暂停功能',
-    leading: const Icon(Icons.volume_up_outlined),
-    setKey: SettingBoxKey.enableBackgroundPlay,
-    defaultVal: true,
-    onChanged: (value) {
-      videoPlayerServiceHandler.enableBackgroundPlay = value;
-    },
-  ),
+  if (Utils.isMobile)
+    SettingsModel(
+      settingsType: SettingsType.sw1tch,
+      title: '后台音频服务',
+      subtitle: '避免画中画没有播放暂停功能',
+      leading: const Icon(Icons.volume_up_outlined),
+      setKey: SettingBoxKey.enableBackgroundPlay,
+      defaultVal: true,
+      onChanged: (value) {
+        videoPlayerServiceHandler!.enableBackgroundPlay = value;
+      },
+    ),
   const SettingsModel(
     settingsType: SettingsType.sw1tch,
     title: '播放器设置仅对当前生效',

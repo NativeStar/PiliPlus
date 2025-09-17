@@ -34,7 +34,6 @@ import 'package:flutter/foundation.dart';
 
 /// view层根据 status 判断渲染逻辑
 class VideoHttp {
-  // static bool enableRcmdDynamic = Pref.enableRcmdDynamic;
   static RegExp zoneRegExp = RegExp(Pref.banWordForZone, caseSensitive: false);
   static bool enableFilter = zoneRegExp.pattern.isNotEmpty;
 
@@ -133,7 +132,6 @@ class VideoHttp {
         if (i['card_goto'] != 'ad_av' &&
             i['card_goto'] != 'ad_web_s' &&
             i['ad_info'] == null &&
-            // (!enableRcmdDynamic ? i['card_goto'] != 'picture' : true) &&
             (i['args'] != null &&
                 !GlobalData().blackMids.contains(i['args']['up_id']))) {
           if (enableFilter &&
@@ -280,7 +278,9 @@ class VideoHttp {
     }
   }
 
-  static Future videoRelation({required dynamic bvid}) async {
+  static Future<LoadingState<VideoRelation>> videoRelation({
+    required String bvid,
+  }) async {
     var res = await Request().get(
       Api.videoRelation,
       queryParameters: {
@@ -289,15 +289,9 @@ class VideoHttp {
       },
     );
     if (res.data['code'] == 0) {
-      return {
-        'status': true,
-        'data': VideoRelation.fromJson(res.data['data']),
-      };
+      return Success(VideoRelation.fromJson(res.data['data']));
     } else {
-      return {
-        'status': false,
-        'msg': res.data['message'],
-      };
+      return Error(res.data['message']);
     }
   }
 
@@ -525,7 +519,7 @@ class VideoHttp {
     int? root,
     int? parent,
     List? pictures,
-    bool? syncToDynamic,
+    bool syncToDynamic = false,
     Map<String, int>? atNameToMid,
   }) async {
     if (message == '') {
@@ -540,7 +534,7 @@ class VideoHttp {
       if (atNameToMid?.isNotEmpty == true)
         'at_name_to_mid': jsonEncode(atNameToMid), // {"name":uid}
       if (pictures != null) 'pictures': jsonEncode(pictures),
-      if (syncToDynamic == true) 'sync_to_dynamic': 1,
+      if (syncToDynamic) 'sync_to_dynamic': 1,
       'csrf': Accounts.main.csrf,
     };
     var res = await Request().post(
@@ -613,6 +607,13 @@ class VideoHttp {
       ),
     );
     if (res.data['code'] == 0) {
+      if (act == 5) {
+        // block
+        Pref.setBlackMid(mid);
+      } else if (act == 6) {
+        // unblock
+        Pref.removeBlackMid(mid);
+      }
       return {'status': true};
     } else {
       return {'status': false, 'msg': res.data['message']};
@@ -799,13 +800,20 @@ class VideoHttp {
       'up_mid': upMid,
     });
     var res = await Request().get(Api.aiConclusion, queryParameters: params);
-    if (res.data['code'] == 0 && res.data['data']['code'] == 0) {
+    final code = res.data['code'];
+    final dataCode = res.data['data']?['code'];
+    if (code == 0 && dataCode == 0) {
       return {
         'status': true,
         'data': AiConclusionData.fromJson(res.data['data']),
       };
     } else {
-      return {'status': false, 'msg': res.data['message']};
+      final handling = code == 0 && dataCode == 1;
+      return {
+        'status': false,
+        'msg': res.data['message'],
+        'handling': handling,
+      };
     }
   }
 

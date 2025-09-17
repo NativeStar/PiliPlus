@@ -1,4 +1,3 @@
-import 'package:PiliPlus/common/skeleton/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/custom_sliver_persistent_header_delegate.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
@@ -11,6 +10,7 @@ import 'package:PiliPlus/pages/member_video/controller.dart';
 import 'package:PiliPlus/pages/member_video/widgets/video_card_h_member_video.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 
 class MemberVideo extends StatefulWidget {
@@ -38,11 +38,9 @@ class MemberVideo extends StatefulWidget {
 }
 
 class _MemberVideoState extends State<MemberVideo>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, GridMixin {
   @override
   bool get wantKeepAlive => true;
-
-  late final gridDelegate = Grid.videoCardHDelegate(context);
 
   late final _controller = Get.put(
     MemberVideoCtr(
@@ -61,15 +59,31 @@ class _MemberVideoState extends State<MemberVideo>
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
-    Widget child = refreshIndicator(
-      onRefresh: _controller.onRefresh,
+    final padding = MediaQuery.viewPaddingOf(context);
+    final child = refreshIndicator(
+      onRefresh: () async {
+        final count = _controller.loadingState.value.dataOrNull?.length;
+        await _controller.onRefresh();
+        if (_controller.isLoadPrevious) {
+          if (mounted) {
+            final newCount = _controller.loadingState.value.dataOrNull?.length;
+            if (count != null && newCount != null && newCount > count) {
+              SchedulerBinding.instance.addPostFrameCallback((_) {
+                PrimaryScrollController.of(this.context).jumpTo(
+                  gridDelegate.layoutCache!
+                      .getGeometryForChildIndex(newCount - count)
+                      .scrollOffset,
+                );
+              });
+            }
+          }
+        }
+      },
       child: CustomScrollView(
         physics: ReloadScrollPhysics(controller: _controller),
         slivers: [
           SliverPadding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.paddingOf(context).bottom + 80,
-            ),
+            padding: EdgeInsets.only(bottom: padding.bottom + 100),
             sliver: Obx(
               () => _buildBody(theme, _controller.loadingState.value),
             ),
@@ -84,40 +98,34 @@ class _MemberVideoState extends State<MemberVideo>
         children: [
           child,
           Obx(
-            () => _controller.isLocating.value != true
+            () => !_controller.isLocating.value
                 ? Positioned(
-                    right: 15,
-                    bottom: 15,
-                    child: SafeArea(
-                      top: false,
-                      left: false,
-                      child: FloatingActionButton.extended(
-                        onPressed: () {
-                          final fromViewAid = _controller.fromViewAid;
+                    right: 15 + padding.right,
+                    bottom: 15 + padding.bottom,
+                    child: FloatingActionButton.extended(
+                      onPressed: () {
+                        final fromViewAid = _controller.fromViewAid;
+                        _controller.isLocating.value = true;
+                        final locatedIndex =
+                            _controller.loadingState.value.dataOrNull
+                                ?.indexWhere((i) => i.param == fromViewAid) ??
+                            -1;
+                        if (locatedIndex == -1) {
                           _controller
-                            ..isLocating.value = true
-                            ..lastAid = fromViewAid;
-                          final locatedIndex = _controller
-                              .loadingState
-                              .value
-                              .dataOrNull
-                              ?.indexWhere((i) => i.param == fromViewAid);
-                          if (locatedIndex == null || locatedIndex == -1) {
-                            _controller
-                              ..reload = true
-                              ..page = 0
-                              ..loadingState.value = LoadingState.loading()
-                              ..queryData();
-                          } else {
-                            PrimaryScrollController.of(context).jumpTo(
-                              gridDelegate.layoutCache!
-                                  .getGeometryForChildIndex(locatedIndex)
-                                  .scrollOffset,
-                            );
-                          }
-                        },
-                        label: const Text('定位至上次观看'),
-                      ),
+                            ..lastAid = fromViewAid
+                            ..reload = true
+                            ..page = 0
+                            ..loadingState.value = LoadingState.loading()
+                            ..queryData();
+                        } else {
+                          PrimaryScrollController.of(context).jumpTo(
+                            gridDelegate.layoutCache!
+                                .getGeometryForChildIndex(locatedIndex)
+                                .scrollOffset,
+                          );
+                        }
+                      },
+                      label: const Text('定位至上次观看'),
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -128,25 +136,18 @@ class _MemberVideoState extends State<MemberVideo>
     return child;
   }
 
+  @override
+  Widget get gridSkeleton => SliverPadding(
+    padding: widget.isSingle ? const EdgeInsets.only(top: 7) : EdgeInsets.zero,
+    sliver: super.gridSkeleton,
+  );
+
   Widget _buildBody(
     ThemeData theme,
     LoadingState<List<SpaceArchiveItem>?> loadingState,
   ) {
     return switch (loadingState) {
-      Loading() => SliverPadding(
-        padding: widget.isSingle
-            ? const EdgeInsets.only(top: 7)
-            : EdgeInsets.zero,
-        sliver: SliverGrid(
-          gridDelegate: Grid.videoCardHDelegate(context),
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              return const VideoCardHSkeleton();
-            },
-            childCount: 10,
-          ),
-        ),
-      ),
+      Loading() => gridSkeleton,
       Success(:var response) =>
         response?.isNotEmpty == true
             ? SliverMainAxisGroup(
@@ -239,27 +240,23 @@ class _MemberVideoState extends State<MemberVideo>
                       ),
                     ),
                   ),
-                  SliverGrid(
+                  SliverGrid.builder(
                     gridDelegate: gridDelegate,
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        if (widget.type != ContributeType.season &&
-                            index == response.length - 1) {
-                          _controller.onLoadMore();
-                        }
-                        return VideoCardHMemberVideo(
-                          videoItem: response[index],
-                          fromViewAid: _controller.fromViewAid,
-                        );
-                      },
-                      childCount: response!.length,
-                    ),
+                    itemBuilder: (context, index) {
+                      if (widget.type != ContributeType.season &&
+                          index == response.length - 1) {
+                        _controller.onLoadMore();
+                      }
+                      return VideoCardHMemberVideo(
+                        videoItem: response[index],
+                        fromViewAid: _controller.fromViewAid,
+                      );
+                    },
+                    itemCount: response!.length,
                   ),
                 ],
               )
-            : HttpError(
-                onReload: _controller.onReload,
-              ),
+            : HttpError(onReload: _controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: _controller.onReload,

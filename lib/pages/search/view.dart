@@ -1,16 +1,20 @@
+import 'dart:convert';
+
 import 'package:PiliPlus/common/widgets/disabled_icon.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/search/search_rcmd/data.dart';
+import 'package:PiliPlus/pages/about/view.dart' show showInportExportDialog;
 import 'package:PiliPlus/pages/search/controller.dart';
 import 'package:PiliPlus/pages/search/widgets/hot_keyword.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
-import 'package:PiliPlus/utils/context_ext.dart';
 import 'package:PiliPlus/utils/em.dart' show Em;
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
 
 class SearchPage extends StatefulWidget {
@@ -30,7 +34,7 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isPortrait = context.isPortrait;
+    final isPortrait = MediaQuery.sizeOf(context).isPortrait;
     return Scaffold(
       appBar: AppBar(
         shape: Border(
@@ -77,7 +81,7 @@ class _SearchPageState extends State<SearchPage> {
         ),
       ),
       body: ListView(
-        padding: MediaQuery.paddingOf(context).copyWith(top: 0),
+        padding: MediaQuery.viewPaddingOf(context).copyWith(top: 0),
         children: [
           if (_searchController.searchSuggestion) _searchSuggest(),
           if (isPortrait) ...[
@@ -117,14 +121,13 @@ class _SearchPageState extends State<SearchPage> {
               _searchController.controller.text != ''
           ? Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: _searchController.searchSuggestList
                   .map(
                     (item) => InkWell(
                       borderRadius: const BorderRadius.all(Radius.circular(4)),
                       onTap: () => _searchController.onClickKeyword(item.term!),
-                      child: Container(
-                        width: double.infinity,
+                      child: Padding(
                         padding: const EdgeInsets.only(
                           left: 20,
                           top: 9,
@@ -331,13 +334,14 @@ class _SearchPageState extends State<SearchPage> {
                         );
                       },
                     ),
+                    _exportHsitory(theme),
                     const Spacer(),
                     SizedBox(
                       height: 34,
                       child: TextButton.icon(
-                        style: ButtonStyle(
-                          padding: WidgetStateProperty.all(
-                            const EdgeInsets.symmetric(
+                        style: const ButtonStyle(
+                          padding: WidgetStatePropertyAll(
+                            EdgeInsets.symmetric(
                               horizontal: 10,
                               vertical: 6,
                             ),
@@ -379,6 +383,36 @@ class _SearchPageState extends State<SearchPage> {
       },
     );
   }
+
+  Widget _exportHsitory(ThemeData theme) => SizedBox(
+    width: 34,
+    height: 34,
+    child: IconButton(
+      iconSize: 22,
+      tooltip: '导入/导出历史记录',
+      icon: Icon(
+        Icons.import_export_outlined,
+        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+      ),
+      style: IconButton.styleFrom(padding: EdgeInsets.zero),
+      onPressed: () => showInportExportDialog<List>(
+        context,
+        title: '历史记录',
+        toJson: () => jsonEncode(_searchController.historyList),
+        fromJson: (json) {
+          try {
+            final list = List<String>.from(json);
+            _searchController.historyList.value = list;
+            GStorage.historyWord.put('cacheList', list);
+            return true;
+          } catch (e) {
+            SmartDialog.showToast(e.toString());
+            return false;
+          }
+        },
+      ),
+    ),
+  );
 
   Icon historyIcon(ThemeData theme) => Icon(
     Icons.history,

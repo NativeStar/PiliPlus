@@ -13,7 +13,7 @@ class CustomToast extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     return Container(
       margin: EdgeInsets.only(
-        bottom: MediaQuery.paddingOf(context).bottom + 30,
+        bottom: MediaQuery.viewPaddingOf(context).bottom + 30,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
       decoration: BoxDecoration(
@@ -46,7 +46,7 @@ class LoadingWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
       decoration: BoxDecoration(
-        color: theme.dialogBackgroundColor,
+        color: theme.dialogTheme.backgroundColor,
         borderRadius: const BorderRadius.all(Radius.circular(15)),
       ),
       child: Column(

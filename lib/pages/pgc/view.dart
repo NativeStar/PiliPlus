@@ -5,6 +5,7 @@ import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/fav_type.dart';
 import 'package:PiliPlus/models/common/home_tab_type.dart';
@@ -23,7 +24,7 @@ import 'package:PiliPlus/utils/grid.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-class PgcPage extends CommonPage {
+class PgcPage extends StatefulWidget {
   const PgcPage({
     super.key,
     required this.tabType,
@@ -76,7 +77,7 @@ class _PgcPageState extends CommonPageState<PgcPage, PgcController>
 
   Widget _buildTimeline(
     ThemeData theme,
-    LoadingState<List<Result>?> loadingState,
+    LoadingState<List<TimelineResult>?> loadingState,
   ) => switch (loadingState) {
     Loading() => loadingWidget,
     Success(:var response) =>
@@ -105,7 +106,7 @@ class _PgcPageState extends CommonPageState<PgcPage, PgcController>
                               isScrollable: true,
                               tabAlignment: TabAlignment.start,
                               dividerHeight: 0,
-                              overlayColor: WidgetStateProperty.all(
+                              overlayColor: const WidgetStatePropertyAll(
                                 Colors.transparent,
                               ),
                               splashFactory: NoSplash.splashFactory,
@@ -160,6 +161,7 @@ class _PgcPageState extends CommonPageState<PgcPage, PgcController>
                               physics: const AlwaysScrollableScrollPhysics(),
                               scrollDirection: Axis.horizontal,
                               itemCount: item.episodes!.length,
+                              padding: EdgeInsets.zero,
                               itemBuilder: (context, index) {
                                 return Container(
                                   width: Grid.smallCardWidth / 2,
@@ -201,10 +203,10 @@ class _PgcPageState extends CommonPageState<PgcPage, PgcController>
   List<Widget> _buildRcmd(ThemeData theme) => [
     _buildRcmdTitle(theme),
     SliverPadding(
-      padding: EdgeInsets.only(
+      padding: const EdgeInsets.only(
         left: StyleString.safeSpace,
         right: StyleString.safeSpace,
-        bottom: MediaQuery.paddingOf(context).bottom + 80,
+        bottom: 100,
       ),
       sliver: Obx(
         () => _buildRcmdBody(controller.loadingState.value),
@@ -243,6 +245,7 @@ class _PgcPageState extends CommonPageState<PgcPage, PgcController>
                 List<int> types = const [102, 2, 5, 3, 7];
                 Get.to(
                   Scaffold(
+                    resizeToAvoidBottomInset: false,
                     appBar: AppBar(title: const Text('索引')),
                     body: DefaultTabController(
                       length: types.length,
@@ -250,9 +253,7 @@ class _PgcPageState extends CommonPageState<PgcPage, PgcController>
                         builder: (context) {
                           return Column(
                             children: [
-                              SafeArea(
-                                top: false,
-                                bottom: false,
+                              ViewSafeArea(
                                 child: TabBar(
                                   tabs: titles
                                       .map((title) => Tab(text: title))
@@ -314,35 +315,30 @@ class _PgcPageState extends CommonPageState<PgcPage, PgcController>
     ),
   );
 
+  late final gridDelegate = SliverGridDelegateWithExtentAndRatio(
+    mainAxisSpacing: StyleString.cardSpace,
+    crossAxisSpacing: StyleString.cardSpace,
+    maxCrossAxisExtent: Grid.smallCardWidth * 0.6,
+    childAspectRatio: 0.75,
+    mainAxisExtent: MediaQuery.textScalerOf(context).scale(50),
+  );
+
   Widget _buildRcmdBody(LoadingState<List<PgcIndexItem>?> loadingState) {
     return switch (loadingState) {
       Loading() => const SliverToBoxAdapter(),
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: SliverGridDelegateWithExtentAndRatio(
-                  // 行间距
-                  mainAxisSpacing: StyleString.cardSpace,
-                  // 列间距
-                  crossAxisSpacing: StyleString.cardSpace,
-                  // 最大宽度
-                  maxCrossAxisExtent: Grid.smallCardWidth / 3 * 2,
-                  childAspectRatio: 0.75,
-                  mainAxisExtent: MediaQuery.textScalerOf(context).scale(50),
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (BuildContext context, int index) {
-                    if (index == response.length - 1) {
-                      controller.onLoadMore();
-                    }
-                    return PgcCardVPgcIndex(item: response[index]);
-                  },
-                  childCount: response!.length,
-                ),
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    controller.onLoadMore();
+                  }
+                  return PgcCardVPgcIndex(item: response[index]);
+                },
+                itemCount: response!.length,
               )
-            : HttpError(
-                onReload: controller.onReload,
-              ),
+            : HttpError(onReload: controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: controller.onReload,
@@ -441,6 +437,7 @@ class _PgcPageState extends CommonPageState<PgcPage, PgcController>
                 controller: controller.followController,
                 scrollDirection: Axis.horizontal,
                 itemCount: response!.length,
+                padding: EdgeInsets.zero,
                 itemBuilder: (context, index) {
                   if (index == response.length - 1) {
                     controller.queryPgcFollow(false);

@@ -12,7 +12,7 @@ import 'package:PiliPlus/models_new/msg/msg_like/item.dart';
 import 'package:PiliPlus/pages/msg_feed_top/like_me/controller.dart';
 import 'package:PiliPlus/pages/whisper_settings/view.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
-import 'package:PiliPlus/utils/date_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -30,6 +30,7 @@ class _LikeMePageState extends State<LikeMePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: const Text('收到的赞'),
         actions: [
@@ -55,7 +56,7 @@ class _LikeMePageState extends State<LikeMePage> {
           slivers: [
             SliverPadding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.paddingOf(context).bottom + 80,
+                bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
               ),
               sliver: Obx(
                 () => _buildBody(theme, _likeMeController.loadingState.value),
@@ -77,9 +78,7 @@ class _LikeMePageState extends State<LikeMePage> {
     return switch (loadingState) {
       Loading() => SliverList.builder(
         itemCount: 12,
-        itemBuilder: (context, index) {
-          return const MsgFeedTopSkeleton();
-        },
+        itemBuilder: (context, index) => const MsgFeedTopSkeleton(),
       ),
       Success(:var response) => Builder(
         builder: (context) {
@@ -313,7 +312,7 @@ class _LikeMePageState extends State<LikeMePage> {
           ],
           const SizedBox(height: 4),
           Text(
-            DateUtil.dateFormat(item.likeTime),
+            DateFormatUtils.dateFormat(item.likeTime),
             style: theme.textTheme.bodyMedium!.copyWith(
               fontSize: 13,
               color: theme.colorScheme.outline,

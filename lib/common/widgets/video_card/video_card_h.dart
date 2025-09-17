@@ -11,8 +11,8 @@ import 'package:PiliPlus/models/common/stat_type.dart';
 import 'package:PiliPlus/models/model_hot_video_item.dart';
 import 'package:PiliPlus/models/model_video.dart';
 import 'package:PiliPlus/models/search/result.dart';
-import 'package:PiliPlus/utils/date_util.dart';
-import 'package:PiliPlus/utils/duration_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
+import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -51,7 +51,9 @@ class VideoCardH extends StatelessWidget {
         badge = '合作';
       }
     } else if (videoItem case HotVideoItemModel item) {
-      if (item.isCooperation == 1) {
+      if (item.isCharging == true) {
+        badge = '充电专属';
+      } else if (item.isCooperation == 1) {
         badge = '合作';
       } else {
         badge = item.pgcLabel;
@@ -147,12 +149,16 @@ class VideoCardH extends StatelessWidget {
                                 text: badge,
                                 top: 6.0,
                                 right: 6.0,
+                                type: switch (badge) {
+                                  '充电专属' => PBadgeType.error,
+                                  _ => PBadgeType.primary,
+                                },
                               ),
                             if (progress != null && progress != 0) ...[
                               PBadge(
                                 text: progress == -1
                                     ? '已看完'
-                                    : '${DurationUtil.formatDuration(progress)}/${DurationUtil.formatDuration(videoItem.duration)}',
+                                    : '${DurationUtils.formatDuration(progress)}/${DurationUtils.formatDuration(videoItem.duration)}',
                                 right: 6,
                                 bottom: 8,
                                 type: PBadgeType.gray,
@@ -169,7 +175,7 @@ class VideoCardH extends StatelessWidget {
                               ),
                             ] else if (videoItem.duration > 0)
                               PBadge(
-                                text: DurationUtil.formatDuration(
+                                text: DurationUtils.formatDuration(
                                   videoItem.duration,
                                 ),
                                 right: 6.0,
@@ -204,7 +210,7 @@ class VideoCardH extends StatelessWidget {
 
   Widget content(BuildContext context) {
     final theme = Theme.of(context);
-    String pubdate = DateUtil.dateFormat(videoItem.pubdate!);
+    String pubdate = DateFormatUtils.dateFormat(videoItem.pubdate!);
     if (pubdate != '') pubdate += '  ';
     return Expanded(
       child: Column(

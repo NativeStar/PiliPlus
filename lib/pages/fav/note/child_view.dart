@@ -1,4 +1,3 @@
-import 'package:PiliPlus/common/skeleton/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/dialog/dialog.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
@@ -21,7 +20,7 @@ class FavNoteChildPage extends StatefulWidget {
 }
 
 class _FavNoteChildPageState extends State<FavNoteChildPage>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, GridMixin {
   late final FavNoteController _favNoteController = Get.put(
     FavNoteController(widget.isPublish),
     tag: '${widget.isPublish}',
@@ -31,7 +30,7 @@ class _FavNoteChildPageState extends State<FavNoteChildPage>
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
-    final padding = MediaQuery.paddingOf(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     final bottomH = 50 + padding.bottom;
     return Stack(
       clipBehavior: Clip.none,
@@ -43,7 +42,7 @@ class _FavNoteChildPageState extends State<FavNoteChildPage>
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverPadding(
-                padding: EdgeInsets.only(bottom: padding.bottom + 80),
+                padding: EdgeInsets.only(bottom: padding.bottom + 100),
                 sliver: Obx(
                   () => _buildBody(_favNoteController.loadingState.value),
                 ),
@@ -73,7 +72,6 @@ class _FavNoteChildPageState extends State<FavNoteChildPage>
                     ),
                   ),
                 ),
-                width: double.infinity,
                 child: Row(
                   children: [
                     const SizedBox(width: 16),
@@ -91,6 +89,7 @@ class _FavNoteChildPageState extends State<FavNoteChildPage>
                         onChanged: (value) {
                           _favNoteController.handleSelect(
                             checked: !_favNoteController.allSelected.value,
+                            disableSelect: false,
                           );
                         },
                       ),
@@ -140,33 +139,23 @@ class _FavNoteChildPageState extends State<FavNoteChildPage>
 
   Widget _buildBody(LoadingState<List<FavNoteItemModel>?> loadingState) {
     return switch (loadingState) {
-      Loading() => SliverGrid(
-        gridDelegate: Grid.videoCardHDelegate(context),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            return const VideoCardHSkeleton();
-          },
-          childCount: 10,
-        ),
-      ),
+      Loading() => gridSkeleton,
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: Grid.videoCardHDelegate(context),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == response.length - 1) {
-                      _favNoteController.onLoadMore();
-                    }
-                    final item = response[index];
-                    return FavNoteItem(
-                      item: item,
-                      ctr: _favNoteController,
-                      onSelect: () => _favNoteController.onSelect(item),
-                    );
-                  },
-                  childCount: response!.length,
-                ),
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    _favNoteController.onLoadMore();
+                  }
+                  final item = response[index];
+                  return FavNoteItem(
+                    item: item,
+                    ctr: _favNoteController,
+                    onSelect: () => _favNoteController.onSelect(item),
+                  );
+                },
+                itemCount: response!.length,
               )
             : HttpError(onReload: _favNoteController.onReload),
       Error(:var errMsg) => HttpError(

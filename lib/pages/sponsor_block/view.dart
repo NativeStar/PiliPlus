@@ -417,12 +417,13 @@ class _SponsorBlockPageState extends State<SponsorBlockPage> {
         ),
         content: SlideColorPicker(
           color: color,
+          showResetBtn: true,
           callback: (Color? color) {
             _blockColor[index] = color ?? item.first.color;
             setting.put(
               SettingBoxKey.blockColor,
               _blockColor
-                  .map((item) => item.value.toRadixString(16).substring(2))
+                  .map((item) => item.toARGB32().toRadixString(16).substring(2))
                   .toList(),
             );
             (context as Element).markNeedsBuild();
@@ -458,6 +459,7 @@ class _SponsorBlockPageState extends State<SponsorBlockPage> {
     );
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: const Text('空降助手')),
       body: CustomScrollView(
         slivers: [
@@ -491,7 +493,7 @@ class _SponsorBlockPageState extends State<SponsorBlockPage> {
           dividerL,
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 55 + MediaQuery.paddingOf(context).bottom,
+              height: 55 + MediaQuery.viewPaddingOf(context).bottom,
             ),
           ),
         ],

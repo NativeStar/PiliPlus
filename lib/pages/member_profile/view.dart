@@ -10,9 +10,9 @@ import 'package:PiliPlus/pages/mine/controller.dart';
 import 'package:PiliPlus/services/account_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/app_sign.dart';
-import 'package:PiliPlus/utils/date_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/extension.dart';
-import 'package:PiliPlus/utils/image_util.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -58,6 +58,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: const Text('账号资料')),
       body: _buildBody(theme, _loadingState),
     );
@@ -127,7 +128,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       Loading() => loadingWidget,
       Success(:var response) => ListView(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.paddingOf(context).bottom + 25,
+          bottom: MediaQuery.viewPaddingOf(context).bottom + 25,
         ),
         children: [
           divider1,
@@ -140,7 +141,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 child: CachedNetworkImage(
                   width: 55,
                   height: 55,
-                  imageUrl: ImageUtil.thumbnailUrl(response.face),
+                  imageUrl: ImageUtils.thumbnailUrl(response.face),
                 ),
               ),
             ),
@@ -194,7 +195,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   if (res != null) {
                     _update(
                       type: ProfileType.birthday,
-                      datum: DateUtil.longFormat.format(res),
+                      datum: DateFormatUtils.longFormat.format(res),
                     );
                   }
                 }),

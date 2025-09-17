@@ -1,5 +1,5 @@
 import 'package:PiliPlus/pages/dynamics_create_reserve/controller.dart';
-import 'package:PiliPlus/utils/date_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
@@ -30,7 +30,7 @@ class _CreateReservePageState extends State<CreateReservePage> {
       fontSize: 15,
       color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.9),
     );
-    final padding = MediaQuery.paddingOf(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     final divider = [
       const SizedBox(height: 10),
       Divider(
@@ -46,7 +46,7 @@ class _CreateReservePageState extends State<CreateReservePage> {
           top: 16,
           left: padding.left + 16,
           right: padding.right + 16,
-          bottom: padding.bottom + 80,
+          bottom: padding.bottom + 100,
         ),
         children: [
           Row(
@@ -127,7 +127,7 @@ class _CreateReservePageState extends State<CreateReservePage> {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Obx(
                       () => Text(
-                        DateUtil.longFormatD.format(_controller.date.value),
+                        DateFormatUtils.longFormatD.format(_controller.date.value),
                       ),
                     ),
                   ),

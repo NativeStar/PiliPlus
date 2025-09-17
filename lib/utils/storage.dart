@@ -12,7 +12,7 @@ import 'package:PiliPlus/utils/set_int_adapter.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
-class GStorage {
+abstract class GStorage {
   static late final Box<UserInfoData> userInfo;
   static late final Box<dynamic> historyWord;
   static late final Box<dynamic> localCache;
@@ -54,18 +54,21 @@ class GStorage {
   }
 
   static String exportAllSettings() {
-    return jsonEncode({
+    return const JsonEncoder.withIndent('    ').convert({
       setting.name: setting.toMap(),
       video.name: video.toMap(),
     });
   }
 
-  static Future<void> importAllSettings(String data) async {
-    final Map<String, dynamic> map = jsonDecode(data);
+  static Future<void> importAllSettings(String data) =>
+      importAllJsonSettings(jsonDecode(data));
+
+  static Future<bool> importAllJsonSettings(Map<String, dynamic> map) async {
     await setting.clear();
     await video.clear();
     await setting.putAll(map[setting.name]);
     await video.putAll(map[video.name]);
+    return true;
   }
 
   static void regAdapter() {

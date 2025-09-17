@@ -19,6 +19,7 @@ import 'dart:math';
 
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -864,6 +865,26 @@ class RichTextEditingController extends TextEditingController {
     return position;
   }
 
+  int tapOffsetSimple(int offset) {
+    for (var e in items) {
+      final range = e.range;
+      if (offset >= range.end) {
+        continue;
+      }
+      if (offset <= range.start) {
+        break;
+      }
+      if (e.isRich) {
+        if (offset * 2 > range.start + range.end) {
+          return range.end;
+        } else {
+          return range.start;
+        }
+      }
+    }
+    return offset;
+  }
+
   int tapOffset(
     int offset, {
     required TextPainter textPainter,
@@ -1018,5 +1039,38 @@ class RichTextEditingController extends TextEditingController {
       }
     }
     return newSelection;
+  }
+
+  String? getSelectionText(TextSelection selection) {
+    try {
+      String text = '';
+      final start = selection.start;
+      final end = selection.end;
+      for (var e in items) {
+        final range = e.range;
+        if (start >= range.end) {
+          continue;
+        }
+        if (end <= range.start) {
+          break;
+        }
+        if (e.isRich) {
+          if (e.emote != null) {
+            text += e.rawText;
+          } else {
+            text += e.text;
+          }
+        } else {
+          text += e.text.substring(
+            max(start, range.start) - range.start,
+            min(end, range.end) - range.start,
+          );
+        }
+      }
+      return text;
+    } catch (e) {
+      if (kDebugMode) debugPrint('err getSelectionText: $e');
+      return null;
+    }
   }
 }

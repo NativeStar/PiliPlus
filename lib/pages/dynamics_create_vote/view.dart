@@ -2,7 +2,7 @@ import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/models/dynamics/vote_model.dart';
 import 'package:PiliPlus/pages/dynamics_create_vote/controller.dart';
-import 'package:PiliPlus/utils/date_util.dart';
+import 'package:PiliPlus/utils/date_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:easy_debounce/easy_throttle.dart';
 import 'package:flutter/material.dart';
@@ -36,7 +36,7 @@ class _CreateVotePageState extends State<CreateVotePage> {
       fontSize: 15,
       color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.9),
     );
-    final padding = MediaQuery.paddingOf(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     final divider = Divider(
       height: 20,
       thickness: 1,
@@ -50,7 +50,7 @@ class _CreateVotePageState extends State<CreateVotePage> {
         padding: EdgeInsets.only(
           left: padding.left + 16,
           right: padding.right + 16,
-          bottom: padding.bottom + 80,
+          bottom: padding.bottom + 100,
         ),
         children: [
           const Text(
@@ -244,7 +244,7 @@ class _CreateVotePageState extends State<CreateVotePage> {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Obx(
                     () => Text(
-                      DateUtil.longFormatD.format(_controller.endtime.value),
+                      DateFormatUtils.longFormatD.format(_controller.endtime.value),
                     ),
                   ),
                 ),

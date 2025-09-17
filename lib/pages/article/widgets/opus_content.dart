@@ -1,7 +1,8 @@
 import 'dart:math';
 
-import 'package:PiliPlus/common/widgets/image/image_view.dart';
+import 'package:PiliPlus/common/widgets/image/custom_grid_view.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
+import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/models/common/image_preview_type.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
 import 'package:PiliPlus/models/dynamics/article_content_model.dart'
@@ -9,29 +10,29 @@ import 'package:PiliPlus/models/dynamics/article_content_model.dart'
 import 'package:PiliPlus/models/dynamics/result.dart';
 import 'package:PiliPlus/pages/dynamics/widgets/vote.dart';
 import 'package:PiliPlus/utils/app_scheme.dart';
+import 'package:PiliPlus/utils/context_ext.dart';
 import 'package:PiliPlus/utils/extension.dart';
-import 'package:PiliPlus/utils/image_util.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cached_network_svg_image/cached_network_svg_image.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:get/get.dart' hide ContextExtensionss;
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:re_highlight/languages/all.dart';
 import 'package:re_highlight/re_highlight.dart';
-import 'package:re_highlight/styles/all.dart';
+import 'package:re_highlight/styles/github-dark.dart';
+import 'package:re_highlight/styles/github.dart';
 
 class OpusContent extends StatelessWidget {
   final List<ArticleContentModel> opus;
-  final void Function(List<String>, int)? callback;
   final double maxWidth;
 
   const OpusContent({
     super.key,
     required this.opus,
-    this.callback,
     required this.maxWidth,
   });
 
@@ -59,10 +60,13 @@ class OpusContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // if (kDebugMode) debugPrint('opusContent');
-
     if (opus.isEmpty) {
       return const SliverToBoxAdapter();
     }
+
+    late final highlight = Highlight()..registerLanguages(builtinAllLanguages);
+    late final isDarkMode = context.isDarkMode;
+
     final colorScheme = Theme.of(context).colorScheme;
     return SliverList.separated(
       itemCount: opus.length,
@@ -118,16 +122,19 @@ class OpusContent extends StatelessWidget {
                             );
                         }
                       case 'TEXT_NODE_TYPE_FORMULA' when (item.formula != null):
+                        final latex = item.formula!.latexContent!;
                         return WidgetSpan(
                           child: CachedNetworkSVGImage(
+                            cacheKey: latex,
+                            semanticsLabel: latex,
                             height: 65,
-                            'https://api.bilibili.com/x/web-frontend/mathjax/tex?formula=${Uri.encodeComponent(item.formula!.latexContent!)}',
+                            '${HttpString.apiBaseUrl}/x/web-frontend/mathjax/tex?formula=${Uri.encodeComponent(latex)}',
                             colorFilter: ColorFilter.mode(
                               colorScheme.onSurfaceVariant,
                               BlendMode.srcIn,
                             ),
                             alignment: Alignment.centerLeft,
-                            placeholderBuilder: (_) => const SizedBox.shrink(),
+                            placeholderBuilder: (_) => Text(latex),
                           ),
                         );
                       default:
@@ -174,20 +181,16 @@ class OpusContent extends StatelessWidget {
                   tag: pic.url!,
                   child: GestureDetector(
                     onTap: () {
-                      if (callback != null) {
-                        callback!([pic.url!], 0);
-                      } else {
-                        PageUtils.imageView(
-                          imgList: [SourceModel(url: pic.url!)],
-                          quality: 60,
-                        );
-                      }
+                      PageUtils.imageView(
+                        imgList: [SourceModel(url: pic.url!)],
+                        quality: 60,
+                      );
                     },
                     child: Center(
                       child: CachedNetworkImage(
                         width: width,
                         height: height,
-                        imageUrl: ImageUtil.thumbnailUrl(pic.url!, 60),
+                        imageUrl: ImageUtils.thumbnailUrl(pic.url!, 60),
                         fadeInDuration: const Duration(milliseconds: 120),
                         fadeOutDuration: const Duration(milliseconds: 120),
                         placeholder: (context, url) =>
@@ -197,9 +200,9 @@ class OpusContent extends StatelessWidget {
                   ),
                 );
               } else {
-                return imageView(
-                  maxWidth,
-                  element.pic!.pics!
+                return CustomGridView(
+                  maxWidth: maxWidth,
+                  picArr: element.pic!.pics!
                       .map(
                         (e) => ImageModel(
                           width: e.width,
@@ -215,7 +218,7 @@ class OpusContent extends StatelessWidget {
                 width: maxWidth,
                 fit: BoxFit.contain,
                 height: element.line!.pic!.height?.toDouble(),
-                imageUrl: ImageUtil.thumbnailUrl(element.line!.pic!.url!),
+                imageUrl: ImageUtils.thumbnailUrl(element.line!.pic!.url!),
               );
             case 5 when (element.list != null):
               return SelectableText.rich(
@@ -228,7 +231,26 @@ class OpusContent extends StatelessWidget {
                           alignment: PlaceholderAlignment.middle,
                         ),
                         ...entry.$2.nodes!.map((item) {
-                          return _getSpan(item.word);
+                          if (item.word != null) {
+                            return _getSpan(item.word);
+                          }
+                          if (item.rich case final rich?) {
+                            final hasUrl = rich.jumpUrl?.isNotEmpty == true;
+                            return TextSpan(
+                              text: '${hasUrl ? '\u{1F517}' : ''}${rich.text}',
+                              recognizer: hasUrl
+                                  ? (TapGestureRecognizer()
+                                      ..onTap = () =>
+                                          PiliScheme.routePushFromUrl(
+                                            rich.jumpUrl!,
+                                          ))
+                                  : null,
+                              style: hasUrl
+                                  ? TextStyle(color: colorScheme.primary)
+                                  : null,
+                            );
+                          }
+                          return const TextSpan();
                         }),
                         if (entry.$1 < element.list!.items!.length - 1)
                           const TextSpan(text: '\n'),
@@ -539,23 +561,22 @@ class OpusContent extends StatelessWidget {
                 ),
               );
             case 7 when (element.code != null):
-              final Highlight highlight = Highlight()
-                ..registerLanguages(builtinAllLanguages);
-              final HighlightResult result = highlight.highlightAuto(
-                element.code!.content!,
-                element.code!.lang == 'language-clike'
-                    ? const ['c', 'java']
-                    : [
-                        element.code!.lang!
-                            .replaceAll('language-', '')
-                            .replaceAll('like', ''),
-                      ],
-              );
-              final TextSpanRenderer renderer = TextSpanRenderer(
+              final renderer = TextSpanRenderer(
                 const TextStyle(),
-                builtinAllThemes['github']!,
+                isDarkMode ? githubDarkTheme : githubTheme,
               );
-              result.render(renderer);
+              highlight
+                  .highlightAuto(
+                    element.code!.content!,
+                    element.code!.lang == 'language-clike'
+                        ? const ['c', 'java']
+                        : [
+                            element.code!.lang!
+                                .replaceAll('language-', '')
+                                .replaceAll('like', ''),
+                          ],
+                  )
+                  .render(renderer);
               return Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -606,6 +627,8 @@ Widget moduleBlockedItem(
   ModuleBlocked moduleBlocked,
   double maxWidth,
 ) {
+  late final isDarkMode = Get.isDarkMode;
+
   BoxDecoration? bgImg() {
     return moduleBlocked.bgImg == null
         ? null
@@ -613,8 +636,8 @@ Widget moduleBlockedItem(
             image: DecorationImage(
               fit: BoxFit.fill,
               image: CachedNetworkImageProvider(
-                ImageUtil.thumbnailUrl(
-                  Get.isDarkMode
+                ImageUtils.thumbnailUrl(
+                  isDarkMode
                       ? moduleBlocked.bgImg!.imgDark
                       : moduleBlocked.bgImg!.imgDay,
                 ),
@@ -627,10 +650,8 @@ Widget moduleBlockedItem(
     return CachedNetworkImage(
       width: width,
       fit: BoxFit.contain,
-      imageUrl: ImageUtil.thumbnailUrl(
-        Get.isDarkMode
-            ? moduleBlocked.icon!.imgDark
-            : moduleBlocked.icon!.imgDay,
+      imageUrl: ImageUtils.thumbnailUrl(
+        isDarkMode ? moduleBlocked.icon!.imgDark : moduleBlocked.icon!.imgDay,
       ),
     );
   }
@@ -645,7 +666,7 @@ Widget moduleBlockedItem(
         padding: padding,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: visualDensity,
-        backgroundColor: Get.isDarkMode
+        backgroundColor: isDarkMode
             ? const Color(0xFF8F0030)
             : const Color(0xFFFF6699),
         foregroundColor: Colors.white,

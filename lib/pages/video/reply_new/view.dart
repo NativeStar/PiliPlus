@@ -6,6 +6,7 @@ import 'package:PiliPlus/common/widgets/button/toolbar_icon_button.dart';
 import 'package:PiliPlus/common/widgets/text_field/controller.dart'
     show RichTextType;
 import 'package:PiliPlus/common/widgets/text_field/text_field.dart';
+import 'package:PiliPlus/common/widgets/view_safe_area.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 import 'package:PiliPlus/http/video.dart';
@@ -17,14 +18,13 @@ import 'package:PiliPlus/pages/emote/view.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/reply_search_item/view.dart';
 import 'package:PiliPlus/utils/context_ext.dart';
-import 'package:PiliPlus/utils/duration_util.dart';
+import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart' hide TextField;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
-import 'package:path_provider/path_provider.dart';
 
 class ReplyPage extends CommonRichTextPubPage {
   final int oid;
@@ -75,25 +75,24 @@ class _ReplyPageState extends CommonRichTextPubPageState<ReplyPage> {
 
   @override
   Widget build(BuildContext context) {
-    Widget child = SafeArea(
-      bottom: false,
+    Widget child = ViewSafeArea(
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Container(
           constraints: const BoxConstraints(maxWidth: 640),
           decoration: BoxDecoration(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(12),
-              topRight: Radius.circular(12),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             color: themeData.colorScheme.surface,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ...buildInputView(),
               buildImagePreview(),
-              buildPanelContainer(themeData, Colors.transparent),
+              Flexible(
+                child: buildPanelContainer(themeData, Colors.transparent),
+              ),
             ],
           ),
         ),
@@ -109,13 +108,11 @@ class _ReplyPageState extends CommonRichTextPubPageState<ReplyPage> {
     return Obx(
       () {
         if (pathList.isNotEmpty) {
-          return Container(
+          return SizedBox(
             height: 85,
-            width: double.infinity,
-            padding: const EdgeInsets.only(bottom: 10),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 15),
+              padding: const EdgeInsets.fromLTRB(15, 0, 15, 10),
               child: Row(
                 spacing: 10,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,6 +266,7 @@ class _ReplyPageState extends CommonRichTextPubPageState<ReplyPage> {
     }) {
       return GestureDetector(
         onTap: onTap,
+        behavior: HitTestBehavior.opaque,
         child: Column(
           spacing: 5,
           mainAxisSize: MainAxisSize.min,
@@ -296,17 +294,18 @@ class _ReplyPageState extends CommonRichTextPubPageState<ReplyPage> {
 
     final isRoot = widget.root == 0;
     final color = themeData.colorScheme.onSurfaceVariant;
+    late final gridDelegate = SliverGridDelegateWithExtentAndRatio(
+      maxCrossAxisExtent: 65,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      mainAxisExtent: 25,
+    );
 
     return SizedBox(
       height: height,
       child: GridView(
         padding: const EdgeInsets.only(left: 12, bottom: 12, right: 12),
-        gridDelegate: SliverGridDelegateWithExtentAndRatio(
-          maxCrossAxisExtent: 65,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          mainAxisExtent: 25,
-        ),
+        gridDelegate: gridDelegate,
         children: [
           item(
             onTap: () async {
@@ -348,7 +347,7 @@ class _ReplyPageState extends CommonRichTextPubPageState<ReplyPage> {
                     tag: heroTag,
                   );
                   onInsertText(
-                    ' ${DurationUtil.formatDuration((plPlayerController.playedTime ?? Duration.zero).inSeconds)} ',
+                    ' ${DurationUtils.formatDuration((plPlayerController.playedTime ?? Duration.zero).inSeconds)} ',
                     RichTextType.common,
                   );
                 } catch (e) {
@@ -374,9 +373,8 @@ class _ReplyPageState extends CommonRichTextPubPageState<ReplyPage> {
                         .videoPlayerController
                         ?.screenshot(format: 'image/png');
                     if (res != null) {
-                      final tempDir = await getTemporaryDirectory();
-                      File file = File(
-                        '${tempDir.path}/${Utils.generateRandomString(8)}.png',
+                      final file = File(
+                        '${await Utils.temporaryDirectory}/${Utils.generateRandomString(8)}.png',
                       );
                       await file.writeAsBytes(res);
                       pathList.add(file.path);

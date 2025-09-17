@@ -26,7 +26,9 @@ class GroupPanel extends StatefulWidget {
 class _GroupPanelState extends State<GroupPanel> {
   LoadingState<List<MemberTagItemModel>> loadingState = LoadingState.loading();
   RxBool showDefaultBtn = true.obs;
-  late final Set<int> tags = widget.tags?.cast<int>().toSet() ?? {};
+  late final Set<int> tags = widget.tags == null
+      ? {}
+      : Set<int>.from(widget.tags!);
 
   @override
   void initState() {
@@ -140,17 +142,15 @@ class _GroupPanelState extends State<GroupPanel> {
             left: 20,
             right: 20,
             top: 12,
-            bottom: MediaQuery.paddingOf(context).bottom + 12,
+            bottom: MediaQuery.viewPaddingOf(context).bottom + 12,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
+              FilledButton.tonal(
                 onPressed: onSave,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.only(left: 30, right: 30),
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  backgroundColor: theme.colorScheme.primary,
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
                 ),
                 child: Obx(() => Text(showDefaultBtn.value ? '保存至默认分组' : '保存')),
               ),

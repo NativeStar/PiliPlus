@@ -948,4 +948,21 @@ class Api {
 
   static const String liveLikeReport =
       '${HttpString.liveBaseUrl}/xlive/app-ucenter/v1/like_info_v3/like/likeReportV3';
+
+  static const String loginDevices =
+      '${HttpString.passBaseUrl}/x/safecenter/user_login_devices';
+
+  static const String bgmDetail = '/x/copyright-music-publicity/bgm/detail';
+
+  static const String wishUpdate =
+      '/x/copyright-music-publicity/bgm/wish/update';
+
+  static const String bgmRecommend =
+      '/x/copyright-music-publicity/bgm/recommend_list';
+
+  static const String spaceShop =
+      '${HttpString.mallBaseUrl}/community-hub/small_shop/feed/tab/item';
+
+  static const String superChatMsg =
+      '${HttpString.liveBaseUrl}/av/v1/SuperChat/getMessageList';
 }

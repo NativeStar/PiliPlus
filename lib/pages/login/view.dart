@@ -1,16 +1,17 @@
 import 'dart:ui';
 
+import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/widgets/scroll_physics.dart';
 import 'package:PiliPlus/pages/login/controller.dart';
-import 'package:PiliPlus/utils/image_util.dart';
+import 'package:PiliPlus/utils/extension.dart';
+import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
-import 'package:get/get.dart';
+import 'package:get/get.dart' hide ContextExtensionss;
 import 'package:pretty_qr_code/pretty_qr_code.dart';
-import 'package:saver_gallery/saver_gallery.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -24,6 +25,7 @@ class _LoginPageState extends State<LoginPage> {
   // 二维码生成时间
   bool showPassword = false;
   GlobalKey globalKey = GlobalKey();
+  final isMobile = Utils.isMobile;
 
   Widget loginByQRCode(ThemeData theme) {
     return Column(
@@ -61,21 +63,9 @@ class _LoginPageState extends State<LoginPage> {
                 );
                 Uint8List pngBytes = byteData!.buffer.asUint8List();
                 SmartDialog.dismiss();
-                SmartDialog.showLoading(msg: '正在保存至图库');
-                String picName = "PiliPlus_loginQRCode_${ImageUtil.time}";
-                final SaveResult result = await SaverGallery.saveImage(
-                  Uint8List.fromList(pngBytes),
-                  fileName: picName,
-                  extension: 'png',
-                  androidRelativePath: "Pictures/PiliPlus",
-                  skipIfExists: false,
-                );
-                SmartDialog.dismiss();
-                if (result.isSuccess) {
-                  await SmartDialog.showToast('「$picName」已保存 ');
-                } else {
-                  await SmartDialog.showToast('保存失败，${result.errorMessage}');
-                }
+                String picName =
+                    "${Constants.appName}_loginQRCode_${ImageUtils.time}";
+                ImageUtils.saveByteImg(bytes: pngBytes, fileName: picName);
               },
               icon: const Icon(Icons.save),
               label: const Text('保存至相册'),
@@ -239,11 +229,7 @@ class _LoginPageState extends State<LoginPage> {
             const SizedBox(width: 10),
             Checkbox(
               value: showPassword,
-              onChanged: (value) {
-                setState(() {
-                  showPassword = value!;
-                });
-              },
+              onChanged: (value) => setState(() => showPassword = value!),
             ),
             const Text('显示密码'),
             const Spacer(),
@@ -364,6 +350,7 @@ class _LoginPageState extends State<LoginPage> {
                 Builder(
                   builder: (context) {
                     return PopupMenuButton<Map<String, dynamic>>(
+                      enabled: isMobile,
                       padding: EdgeInsets.zero,
                       tooltip:
                           '选择国际冠码，'
@@ -415,6 +402,7 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: TextField(
+                    enabled: isMobile,
                     controller: _loginPageCtr.telTextController,
                     keyboardType: TextInputType.number,
                     inputFormatters: <TextInputFormatter>[
@@ -446,6 +434,7 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 Expanded(
                   child: TextField(
+                    enabled: isMobile,
                     controller: _loginPageCtr.smsCodeTextController,
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.sms_outlined),
@@ -460,9 +449,11 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 Obx(
                   () => TextButton.icon(
-                    onPressed: _loginPageCtr.smsSendCooldown > 0
-                        ? null
-                        : _loginPageCtr.sendSmsCode,
+                    onPressed: isMobile
+                        ? (_loginPageCtr.smsSendCooldown > 0
+                              ? null
+                              : _loginPageCtr.sendSmsCode)
+                        : null,
                     icon: const Icon(Icons.send),
                     label: Text(
                       _loginPageCtr.smsSendCooldown > 0
@@ -477,7 +468,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         const SizedBox(height: 20),
         OutlinedButton.icon(
-          onPressed: _loginPageCtr.loginBySmsCode,
+          onPressed: isMobile ? _loginPageCtr.loginBySmsCode : null,
           icon: const Icon(Icons.login),
           label: const Text('登录'),
         ),
@@ -504,94 +495,90 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     padding =
-        MediaQuery.paddingOf(context).copyWith(top: 0) +
+        MediaQuery.viewPaddingOf(context).copyWith(top: 0) +
         const EdgeInsets.only(bottom: 25);
-    return OrientationBuilder(
-      builder: (context, orientation) {
-        final isLandscape = orientation == Orientation.landscape;
-        return Scaffold(
-          appBar: AppBar(
-            leading: IconButton(
-              tooltip: '关闭',
-              icon: const Icon(Icons.close_outlined),
-              onPressed: Get.back,
-            ),
-            title: Row(
-              children: [
-                const Text('登录'),
-                if (isLandscape)
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: TabBar(
-                        isScrollable: true,
-                        dividerHeight: 0,
-                        tabs: const [
-                          Tab(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [Icon(Icons.password), Text(' 密码')],
-                            ),
-                          ),
-                          Tab(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [Icon(Icons.sms_outlined), Text(' 短信')],
-                            ),
-                          ),
-                          Tab(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [Icon(Icons.qr_code), Text(' 扫码')],
-                            ),
-                          ),
-                          Tab(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.cookie_outlined),
-                                Text(' Cookie'),
-                              ],
-                            ),
-                          ),
-                        ],
-                        controller: _loginPageCtr.tabController,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            bottom: !isLandscape
-                ? TabBar(
+    final isLandscape = !MediaQuery.sizeOf(context).isPortrait;
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: '关闭',
+          icon: const Icon(Icons.close_outlined),
+          onPressed: Get.back,
+        ),
+        title: Row(
+          children: [
+            const Text('登录'),
+            if (isLandscape)
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: TabBar(
+                    isScrollable: true,
+                    dividerHeight: 0,
                     tabs: const [
-                      Tab(icon: Icon(Icons.password), text: '密码'),
-                      Tab(icon: Icon(Icons.sms_outlined), text: '短信'),
-                      Tab(icon: Icon(Icons.qr_code), text: '扫码'),
-                      Tab(icon: Icon(Icons.cookie_outlined), text: 'Cookie'),
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [Icon(Icons.password), Text(' 密码')],
+                        ),
+                      ),
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [Icon(Icons.sms_outlined), Text(' 短信')],
+                        ),
+                      ),
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [Icon(Icons.qr_code), Text(' 扫码')],
+                        ),
+                      ),
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.cookie_outlined),
+                            Text(' Cookie'),
+                          ],
+                        ),
+                      ),
                     ],
                     controller: _loginPageCtr.tabController,
-                  )
-                : null,
-          ),
-          body: NotificationListener<ScrollStartNotification>(
-            onNotification: (notification) {
-              if (notification.metrics.axis == Axis.horizontal) {
-                FocusScope.of(context).unfocus();
-              }
-              return false;
-            },
-            child: tabBarView(
-              controller: _loginPageCtr.tabController,
-              children: [
-                tabViewOuter(loginByPassword(theme)),
-                tabViewOuter(loginBySmS(theme)),
-                tabViewOuter(loginByQRCode(theme)),
-                tabViewOuter(loginByCookie(theme)),
-              ],
-            ),
-          ),
-        );
-      },
+                  ),
+                ),
+              ),
+          ],
+        ),
+        bottom: !isLandscape
+            ? TabBar(
+                tabs: const [
+                  Tab(icon: Icon(Icons.password), text: '密码'),
+                  Tab(icon: Icon(Icons.sms_outlined), text: '短信'),
+                  Tab(icon: Icon(Icons.qr_code), text: '扫码'),
+                  Tab(icon: Icon(Icons.cookie_outlined), text: 'Cookie'),
+                ],
+                controller: _loginPageCtr.tabController,
+              )
+            : null,
+      ),
+      body: NotificationListener<ScrollStartNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.axis == Axis.horizontal) {
+            FocusScope.of(context).unfocus();
+          }
+          return false;
+        },
+        child: tabBarView(
+          controller: _loginPageCtr.tabController,
+          children: [
+            tabViewOuter(loginByPassword(theme)),
+            tabViewOuter(loginBySmS(theme)),
+            tabViewOuter(loginByQRCode(theme)),
+            tabViewOuter(loginByCookie(theme)),
+          ],
+        ),
+      ),
     );
   }
 

@@ -22,7 +22,6 @@ import 'package:PiliPlus/models_new/video/video_detail/section.dart';
 import 'package:PiliPlus/models_new/video/video_detail/staff.dart';
 import 'package:PiliPlus/models_new/video/video_detail/stat_detail.dart';
 import 'package:PiliPlus/models_new/video/video_detail/ugc_season.dart';
-import 'package:PiliPlus/models_new/video/video_relation/data.dart';
 import 'package:PiliPlus/pages/common/common_intro_controller.dart';
 import 'package:PiliPlus/pages/dynamics_repost/view.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
@@ -31,6 +30,7 @@ import 'package:PiliPlus/pages/video/related/controller.dart';
 import 'package:PiliPlus/pages/video/reply/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/services/service_locator.dart';
+import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/context_ext.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
@@ -41,6 +41,7 @@ import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:expandable/expandable.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
@@ -90,7 +91,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
     var res = await VideoHttp.videoIntro(bvid: bvid);
     if (res.isSuccess) {
       VideoDetailData data = res.data;
-      videoPlayerServiceHandler.onVideoDetailChange(data, cid.value, heroTag);
+      videoPlayerServiceHandler?.onVideoDetailChange(data, cid.value, heroTag);
       if (videoDetail.value.ugcSeason?.id == data.ugcSeason?.id) {
         // keep reversed season
         data.ugcSeason = videoDetail.value.ugcSeason;
@@ -164,19 +165,18 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
 
   Future<void> queryAllStatus() async {
     var result = await VideoHttp.videoRelation(bvid: bvid);
-    if (result['status']) {
-      VideoRelation data = result['data'];
+    if (result case Success(:var response)) {
       late final stat = videoDetail.value.stat!;
-      if (data.like!) {
+      if (response.like!) {
         stat.like = max(1, stat.like);
       }
-      if (data.favorite!) {
+      if (response.favorite!) {
         stat.favorite = max(1, stat.favorite);
       }
-      hasLike.value = data.like!;
-      hasDislike.value = data.dislike!;
-      coinNum.value = data.coin!;
-      hasFav.value = data.favorite!;
+      hasLike.value = response.like!;
+      hasDislike.value = response.dislike!;
+      coinNum.value = response.coin!;
+      hasFav.value = response.favorite!;
     }
   }
 
@@ -197,21 +197,21 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
     if (result['status']) {
       UgcTriple data = result['data'];
       late final stat = videoDetail.value.stat!;
-      if (data.like != hasLike.value) {
+      if (data.like == true && !hasLike.value) {
         stat.like++;
         hasLike.value = true;
       }
-      if (data.coin != hasCoin) {
+      if (data.coin == true && !hasCoin) {
         stat.coin += 2;
         coinNum.value = 2;
         GlobalData().afterCoin(2);
       }
-      if (data.fav != hasFav.value) {
+      if (data.fav == true && !hasFav.value) {
         stat.favorite++;
         hasFav.value = true;
       }
       hasDislike.value = false;
-      if (data.coin != true) {
+      if (!hasCoin) {
         SmartDialog.showToast('投币失败');
       } else {
         SmartDialog.showToast('三连成功');
@@ -429,7 +429,11 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
       SmartDialog.showToast('账号未登录');
       return;
     }
-    int? mid = videoDetail.value.owner?.mid;
+    final videoDetail = this.videoDetail.value;
+    if (videoDetail.staff?.isNotEmpty == true) {
+      return;
+    }
+    int? mid = videoDetail.owner?.mid;
     if (mid == null) {
       return;
     }
@@ -441,7 +445,6 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
         reSrc: 11,
       );
       if (res['status']) {
-        Pref.removeBlackMid(mid);
         followStatus['attribute'] = 0;
       }
       return;
@@ -460,7 +463,10 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
   }
 
   // 修改分P或番剧分集
-  Future<void> onChangeEpisode(BaseEpisodeItem episode, {bool? isStein}) async {
+  Future<void> onChangeEpisode(
+    BaseEpisodeItem episode, {
+    bool isStein = false,
+  }) async {
     try {
       final String bvid = episode.bvid ?? this.bvid;
       final int aid = episode.aid ?? IdUtils.bv2av(bvid);
@@ -490,7 +496,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
         ..plPlayerController.pause()
         ..makeHeartBeat()
         ..updateMediaListHistory(aid)
-        ..onReset(isStein)
+        ..onReset(isStein: isStein)
         ..bvid = bvid
         ..aid = aid
         ..cid.value = cid
@@ -528,7 +534,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
       } else {
         if (episode is Part) {
           final videoDetail = this.videoDetail.value;
-          videoPlayerServiceHandler.onVideoDetailChange(
+          videoPlayerServiceHandler?.onVideoDetailChange(
             episode,
             cid,
             heroTag,
@@ -541,7 +547,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
       this.cid.value = cid;
       queryOnlineTotal();
     } catch (e) {
-      debugPrint('ugc onChangeEpisode: $e');
+      if (kDebugMode) debugPrint('ugc onChangeEpisode: $e');
     }
   }
 
@@ -741,6 +747,10 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
 
   // ai总结
   Future aiConclusion() async {
+    if (!Accounts.heartbeat.isLogin) {
+      SmartDialog.showToast("账号未登录");
+      return;
+    }
     SmartDialog.showLoading(msg: '正在获取AI总结');
     final res = await VideoHttp.aiConclusion(
       bvid: bvid,
@@ -751,8 +761,10 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
     if (res['status']) {
       AiConclusionData data = res['data'];
       aiConclusionResult = data.modelResult;
+    } else if (res['handling']) {
+      SmartDialog.showToast("AI处理中，请稍后再试");
     } else {
-      SmartDialog.showToast("当前视频可能暂不支持AI视频总结");
+      SmartDialog.showToast("当前视频暂不支持AI视频总结");
     }
   }
 }

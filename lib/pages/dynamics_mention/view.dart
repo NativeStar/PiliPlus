@@ -10,7 +10,7 @@ import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models_new/dynamic/dyn_mention/group.dart';
 import 'package:PiliPlus/pages/dynamics_mention/controller.dart';
 import 'package:PiliPlus/pages/dynamics_mention/widgets/item.dart';
-import 'package:PiliPlus/pages/search/controller.dart' show SearchState;
+import 'package:PiliPlus/pages/search/controller.dart' show DebounceStreamState;
 import 'package:PiliPlus/utils/context_ext.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:flutter/material.dart';
@@ -58,7 +58,8 @@ class DynMentionPanel extends StatefulWidget {
   State<DynMentionPanel> createState() => _DynMentionPanelState();
 }
 
-class _DynMentionPanelState extends SearchState<DynMentionPanel> {
+class _DynMentionPanelState
+    extends DebounceStreamState<DynMentionPanel, String> {
   final _controller = Get.put(DynMentionController());
   @override
   Duration get duration => const Duration(milliseconds: 300);
@@ -72,7 +73,7 @@ class _DynMentionPanelState extends SearchState<DynMentionPanel> {
   }
 
   @override
-  void onKeywordChanged(String value) => _controller
+  void onValueChanged(String value) => _controller
     ..enableClear.value = value.isNotEmpty
     ..onRefresh().whenComplete(
       () => WidgetsBinding.instance.addPostFrameCallback(
@@ -188,9 +189,7 @@ class _DynMentionPanelState extends SearchState<DynMentionPanel> {
                       () => _buildBody(theme, _controller.loadingState.value),
                     ),
                     SliverToBoxAdapter(
-                      child: SizedBox(
-                        height: padding + viewInset + 80,
-                      ),
+                      child: SizedBox(height: padding + viewInset + 100),
                     ),
                   ],
                 ),

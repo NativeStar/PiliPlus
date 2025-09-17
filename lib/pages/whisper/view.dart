@@ -22,7 +22,9 @@ class _WhisperPageState extends State<WhisperPage> {
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.viewPaddingOf(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: const Text('消息'),
         actions: [
@@ -36,6 +38,7 @@ class _WhisperPageState extends State<WhisperPage> {
                     onPressed: () => e.type.action(
                       context: context,
                       controller: _controller,
+                      item: e,
                     ),
                     icon: e.type.icon,
                   );
@@ -55,6 +58,7 @@ class _WhisperPageState extends State<WhisperPage> {
                           onTap: () => e.type.action(
                             context: context,
                             controller: _controller,
+                            item: e,
                           ),
                           child: Row(
                             children: [
@@ -77,11 +81,9 @@ class _WhisperPageState extends State<WhisperPage> {
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            _buildTopItems,
+            _buildTopItems(padding),
             SliverPadding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.paddingOf(context).bottom + 100,
-              ),
+              padding: EdgeInsets.only(bottom: padding.bottom + 100),
               sliver: Obx(() => _buildBody(_controller.loadingState.value)),
             ),
           ],
@@ -100,9 +102,7 @@ class _WhisperPageState extends State<WhisperPage> {
     return switch (loadingState) {
       Loading() => SliverList.builder(
         itemCount: 12,
-        itemBuilder: (context, index) {
-          return const WhisperItemSkeleton();
-        },
+        itemBuilder: (context, index) => const WhisperItemSkeleton(),
       ),
       Success(:var response) =>
         response?.isNotEmpty == true
@@ -125,9 +125,7 @@ class _WhisperPageState extends State<WhisperPage> {
                 },
                 separatorBuilder: (context, index) => divider,
               )
-            : HttpError(
-                onReload: _controller.onReload,
-              ),
+            : HttpError(onReload: _controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
         onReload: _controller.onReload,
@@ -135,11 +133,10 @@ class _WhisperPageState extends State<WhisperPage> {
     };
   }
 
-  Widget get _buildTopItems {
+  Widget _buildTopItems(EdgeInsets padding) {
     final ThemeData theme = Theme.of(context);
-    return SliverSafeArea(
-      top: false,
-      bottom: false,
+    return SliverPadding(
+      padding: EdgeInsets.only(left: padding.left, right: padding.right),
       sliver: SliverToBoxAdapter(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,

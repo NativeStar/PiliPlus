@@ -1,4 +1,3 @@
-import 'package:PiliPlus/common/skeleton/video_card_h.dart';
 import 'package:PiliPlus/common/widgets/appbar/appbar.dart';
 import 'package:PiliPlus/common/widgets/keep_alive_wrapper.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
@@ -24,7 +23,7 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, GridMixin {
   late final _historyController = Get.put(
     HistoryController(widget.type),
     tag: widget.type ?? 'all',
@@ -51,6 +50,7 @@ class _HistoryPageState extends State<HistoryPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final padding = MediaQuery.viewPaddingOf(context);
     Widget child = refreshIndicator(
       onRefresh: _historyController.onRefresh,
       child: CustomScrollView(
@@ -60,7 +60,7 @@ class _HistoryPageState extends State<HistoryPage>
           SliverPadding(
             padding: EdgeInsets.only(
               top: 7,
-              bottom: MediaQuery.paddingOf(context).bottom + 80,
+              bottom: padding.bottom + 100,
             ),
             sliver: Obx(
               () => _buildBody(_historyController.loadingState.value),
@@ -84,23 +84,22 @@ class _HistoryPageState extends State<HistoryPage>
             }
           },
           child: Scaffold(
+            resizeToAvoidBottomInset: false,
             appBar: MultiSelectAppBarWidget(
               visible: enableMultiSelect,
               ctr: currCtr(),
               child: _buildAppBar,
             ),
-            body: Obx(() {
-              if (_historyController.tabs.isEmpty) {
-                return SafeArea(
-                  top: false,
-                  bottom: false,
-                  child: child,
-                );
-              }
-              return SafeArea(
-                top: false,
-                bottom: false,
-                child: Column(
+            body: Padding(
+              padding: EdgeInsets.only(
+                left: padding.left,
+                right: padding.right,
+              ),
+              child: Obx(() {
+                if (_historyController.tabs.isEmpty) {
+                  return child;
+                }
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     TabBar(
@@ -140,9 +139,9 @@ class _HistoryPageState extends State<HistoryPage>
                       ),
                     ),
                   ],
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         );
       },
@@ -217,34 +216,24 @@ class _HistoryPageState extends State<HistoryPage>
 
   Widget _buildBody(LoadingState<List<HistoryItemModel>?> loadingState) {
     return switch (loadingState) {
-      Loading() => SliverGrid(
-        gridDelegate: Grid.videoCardHDelegate(context),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            return const VideoCardHSkeleton();
-          },
-          childCount: 10,
-        ),
-      ),
+      Loading() => gridSkeleton,
       Success(:var response) =>
         response?.isNotEmpty == true
-            ? SliverGrid(
-                gridDelegate: Grid.videoCardHDelegate(context),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == response.length - 1) {
-                      _historyController.onLoadMore();
-                    }
-                    final item = response[index];
-                    return HistoryItem(
-                      item: item,
-                      ctr: _historyController,
-                      onDelete: (kid, business) =>
-                          _historyController.delHistory(item),
-                    );
-                  },
-                  childCount: response!.length,
-                ),
+            ? SliverGrid.builder(
+                gridDelegate: gridDelegate,
+                itemBuilder: (context, index) {
+                  if (index == response.length - 1) {
+                    _historyController.onLoadMore();
+                  }
+                  final item = response[index];
+                  return HistoryItem(
+                    item: item,
+                    ctr: _historyController,
+                    onDelete: (kid, business) =>
+                        _historyController.delHistory(item),
+                  );
+                },
+                itemCount: response!.length,
               )
             : HttpError(onReload: _historyController.onReload),
       Error(:var errMsg) => HttpError(

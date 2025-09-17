@@ -6,10 +6,13 @@ import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/live.dart';
 import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/common/video/live_quality.dart';
+import 'package:PiliPlus/models_new/live/live_danmaku/danmaku_msg.dart';
+import 'package:PiliPlus/models_new/live/live_danmaku/live_emote.dart';
 import 'package:PiliPlus/models_new/live/live_dm_info/data.dart';
 import 'package:PiliPlus/models_new/live/live_room_info_h5/data.dart';
 import 'package:PiliPlus/models_new/live/live_room_play_info/codec.dart';
 import 'package:PiliPlus/models_new/live/live_room_play_info/data.dart';
+import 'package:PiliPlus/models_new/live/live_superchat/item.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_source.dart';
 import 'package:PiliPlus/services/service_locator.dart';
@@ -18,9 +21,11 @@ import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/danmaku_utils.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:PiliPlus/utils/video_utils.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:easy_debounce/easy_throttle.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -59,13 +64,17 @@ class LiveRoomController extends GetxController {
   // dm
   LiveDmInfoData? dmInfo;
   List<RichTextItem>? savedDanmaku;
-  RxList<dynamic> messages = [].obs;
+  RxList<DanmakuMsg> messages = <DanmakuMsg>[].obs;
+  late final Rx<SuperChatItem?> fsSC = Rx<SuperChatItem?>(null);
+  late final RxList<SuperChatItem> superChatMsg = <SuperChatItem>[].obs;
   RxBool disableAutoScroll = false.obs;
   LiveMessageStream? _msgStream;
   late final ScrollController scrollController = ScrollController()
     ..addListener(listener);
+  late final RxInt pageIndex = 0.obs;
+  PageController? pageController;
 
-  int? currentQn;
+  int? currentQn = Utils.isMobile ? null : Pref.liveQuality;
   RxString currentQnDesc = ''.obs;
   final RxBool isPortrait = false.obs;
   late List<({int code, String desc})> acceptQnList = [];
@@ -77,6 +86,8 @@ class LiveRoomController extends GetxController {
   bool? isPlaying;
   late bool isFullScreen = false;
 
+  final showSuperChat = Pref.showSuperChat;
+
   @override
   void onInit() {
     super.onInit();
@@ -87,6 +98,9 @@ class LiveRoomController extends GetxController {
     queryLiveInfoH5();
     if (isLogin && !Pref.historyPause) {
       VideoHttp.roomEntryAction(roomId: roomId);
+    }
+    if (showSuperChat) {
+      pageController = PageController();
     }
   }
 
@@ -112,13 +126,9 @@ class LiveRoomController extends GetxController {
   }
 
   Future<void> queryLiveUrl() async {
-    if (currentQn == null) {
-      await Connectivity().checkConnectivity().then((res) {
-        currentQn = res.contains(ConnectivityResult.wifi)
-            ? Pref.liveQuality
-            : Pref.liveQualityCellular;
-      });
-    }
+    currentQn ??= await Utils.isWiFi
+        ? Pref.liveQuality
+        : Pref.liveQualityCellular;
     var res = await LiveHttp.liveRoomInfo(
       roomId: roomId,
       qn: currentQn,
@@ -160,7 +170,7 @@ class LiveRoomController extends GetxController {
     if (res['status']) {
       RoomInfoH5Data data = res['data'];
       roomInfoH5.value = data;
-      videoPlayerServiceHandler.onVideoDetailChange(data, roomId, heroTag);
+      videoPlayerServiceHandler?.onVideoDetailChange(data, roomId, heroTag);
     } else {
       if (res['msg'] != null) {
         _showDialog(res['msg']);
@@ -201,35 +211,50 @@ class LiveRoomController extends GetxController {
     }
   }
 
+  void jumpToBottom() {
+    if (scrollController.hasClients) {
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+    }
+  }
+
   void closeLiveMsg() {
     _msgStream?.close();
     _msgStream = null;
   }
 
+  Future<void> prefetch() async {
+    final res = await LiveHttp.liveRoomDanmaPrefetch(roomId: roomId);
+    if (res['status']) {
+      if (res['data'] case List list) {
+        try {
+          messages.addAll(
+            list.cast<Map<String, dynamic>>().map(DanmakuMsg.fromPrefetch),
+          );
+          WidgetsBinding.instance.addPostFrameCallback(scrollToBottom);
+        } catch (e) {
+          if (kDebugMode) debugPrint(e.toString());
+        }
+      }
+    }
+  }
+
+  Future<void> getSuperChatMsg() async {
+    final res = await LiveHttp.superChatMsg(roomId);
+    if (res.dataOrNull?.list case List<SuperChatItem> list) {
+      superChatMsg.addAll(list);
+    }
+  }
+
+  void clearSC() {
+    superChatMsg.removeWhere((e) => e.expired);
+  }
+
   void startLiveMsg() {
     if (messages.isEmpty) {
-      LiveHttp.liveRoomDanmaPrefetch(roomId: roomId).then((v) {
-        if (v['status']) {
-          if (v['data'] case List list) {
-            try {
-              messages.addAll(
-                list.map(
-                  (obj) => {
-                    'name': obj['user']['base']['name'],
-                    'uid': obj['user']['uid'],
-                    'text': obj['text'],
-                    'emots': obj['emots'],
-                    'uemote': obj['emoticon']['emoticon_unique'] != ""
-                        ? obj['emoticon']
-                        : null,
-                  },
-                ),
-              );
-              WidgetsBinding.instance.addPostFrameCallback(scrollToBottom);
-            } catch (_) {}
-          }
-        }
-      });
+      prefetch();
+      if (showSuperChat) {
+        getSuperChatMsg();
+      }
     }
     if (_msgStream != null) {
       return;
@@ -261,14 +286,20 @@ class LiveRoomController extends GetxController {
 
   @override
   void onClose() {
+    closeLiveMsg();
     cancelLikeTimer();
     cancelLiveTimer();
     savedDanmaku?.clear();
     savedDanmaku = null;
-    closeLiveMsg();
+    messages.clear();
+    if (showSuperChat) {
+      superChatMsg.clear();
+      fsSC.value = null;
+    }
     scrollController
       ..removeListener(listener)
       ..dispose();
+    pageController?.dispose();
     super.onClose();
   }
 
@@ -298,39 +329,64 @@ class LiveRoomController extends GetxController {
           )
           ..addEventListener((obj) {
             try {
-              if (obj['cmd'] == 'DANMU_MSG') {
-                // logger.i(' 原始弹幕消息 ======> ${jsonEncode(obj)}');
-                final info = obj['info'];
-                final first = info[0];
-                final content = first[15];
-                final extra = jsonDecode(content['extra']);
-                final user = content['user'];
-                final uid = user['uid'];
-                messages.add({
-                  'name': user['base']['name'],
-                  'uid': uid,
-                  'text': info[1],
-                  'emots': extra['emots'],
-                  'uemote': first[13],
-                });
-
-                if (plPlayerController.showDanmaku) {
-                  plPlayerController.danmakuController?.addDanmaku(
-                    DanmakuContentItem(
-                      extra['content'],
-                      color: DmUtils.decimalToColor(extra['color']),
-                      type: DmUtils.getPosition(extra['mode']),
-                      selfSend: isLogin && uid == mid,
+              // logger.i(' 原始弹幕消息 ======> ${jsonEncode(obj)}');
+              switch (obj['cmd']) {
+                case 'DANMU_MSG':
+                  final info = obj['info'];
+                  final first = info[0];
+                  final content = first[15];
+                  final extra = jsonDecode(content['extra']);
+                  final user = content['user'];
+                  final uid = user['uid'];
+                  BaseEmote? uemote;
+                  if (first[13] case Map<String, dynamic> map) {
+                    uemote = BaseEmote.fromJson(map);
+                  }
+                  messages.add(
+                    DanmakuMsg(
+                      name: user['base']['name'],
+                      uid: uid,
+                      text: info[1],
+                      emots: (extra['emots'] as Map<String, dynamic>?)?.map(
+                        (k, v) => MapEntry(k, BaseEmote.fromJson(v)),
+                      ),
+                      uemote: uemote,
                     ),
                   );
-                  if (!isFullScreen && !disableAutoScroll.value) {
-                    WidgetsBinding.instance.addPostFrameCallback(
-                      scrollToBottom,
+
+                  if (plPlayerController.showDanmaku) {
+                    plPlayerController.danmakuController?.addDanmaku(
+                      DanmakuContentItem(
+                        extra['content'],
+                        color: DmUtils.decimalToColor(extra['color']),
+                        type: DmUtils.getPosition(extra['mode']),
+                        selfSend: extra['send_from_me'] ?? false,
+                      ),
                     );
+                    if (!disableAutoScroll.value) {
+                      EasyThrottle.throttle(
+                        'liveDm',
+                        const Duration(milliseconds: 500),
+                        () => WidgetsBinding.instance.addPostFrameCallback(
+                          scrollToBottom,
+                        ),
+                      );
+                    }
                   }
-                }
+                  break;
+                case 'SUPER_CHAT_MESSAGE' when (showSuperChat):
+                  final item = SuperChatItem.fromJson(obj['data']);
+                  superChatMsg.insert(0, item);
+                  if (isFullScreen) {
+                    fsSC.value = item;
+                  }
+                  break;
               }
-            } catch (_) {}
+            } catch (e) {
+              if (kDebugMode) {
+                debugPrint('$e,,$obj');
+              }
+            }
           })
           ..init();
   }

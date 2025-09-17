@@ -24,7 +24,7 @@ class _BarSetPageState extends State<BarSetPage> {
     key = args['key'];
     title = args['title'] ?? '';
     defaultBars = List<EnumWithLabel>.from(args['defaultBars']);
-    List<int>? bars = (GStorage.setting.get(key) as List?)?.cast();
+    List? bars = GStorage.setting.get(key);
     if (bars != null) {
       barIndex = {for (var (k, v) in bars.indexed) v: k};
 
@@ -58,6 +58,7 @@ class _BarSetPageState extends State<BarSetPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text('$title编辑'),
         actions: [
@@ -67,11 +68,13 @@ class _BarSetPageState extends State<BarSetPage> {
       ),
       body: ReorderableListView(
         onReorder: onReorder,
-        footer: SizedBox(
-          height: MediaQuery.paddingOf(context).bottom + 30,
+        footer: Padding(
+          padding:
+              MediaQuery.viewPaddingOf(context).copyWith(top: 0, left: 0) +
+              const EdgeInsets.only(right: 34, top: 10),
           child: const Align(
             alignment: Alignment.centerRight,
-            child: Text('*长按拖动排序        '),
+            child: Text('*长按拖动排序'),
           ),
         ),
         children: defaultBars

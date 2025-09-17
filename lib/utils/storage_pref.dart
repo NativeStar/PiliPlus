@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:math' show pow, min, sqrt;
+import 'dart:math' show pow, sqrt;
 
 import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/http/constants.dart';
@@ -21,10 +21,12 @@ import 'package:PiliPlus/models/user/danmaku_rule.dart';
 import 'package:PiliPlus/models/user/info.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_progress_behavior.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
+import 'package:PiliPlus/plugin/pl_player/models/hwdec_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
 import 'package:PiliPlus/utils/context_ext.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/global_data.dart';
+import 'package:PiliPlus/utils/login_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter/material.dart';
@@ -32,7 +34,7 @@ import 'package:get/get.dart' hide ContextExtensionss;
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
-class Pref {
+abstract class Pref {
   static final Box _setting = GStorage.setting;
   static final Box _video = GStorage.video;
   static final Box _localCache = GStorage.localCache;
@@ -116,31 +118,30 @@ class Pref {
     ),
   );
 
-  static List<int>? get tabbarSort =>
-      (_setting.get(SettingBoxKey.tabBarSort) as List?)?.cast<int>();
-
   static List<Pair<SegmentType, SkipType>> get blockSettings {
-    List<int>? list = (_setting.get(SettingBoxKey.blockSettings) as List?)
-        ?.cast<int>();
+    final list = _setting.get(SettingBoxKey.blockSettings) as List?;
+    if (list == null) {
+      return SegmentType.values
+          .map((i) => Pair(first: i, second: SkipType.skipOnce))
+          .toList();
+    }
     return SegmentType.values
         .map(
-          (item) => Pair<SegmentType, SkipType>(
-            first: item,
-            second: SkipType.values[list?[item.index] ?? 1],
-          ),
+          (item) =>
+              Pair(first: item, second: SkipType.values[list[item.index]]),
         )
         .toList();
   }
 
   static List<Color> get blockColor {
-    List<String>? list = (_setting.get(SettingBoxKey.blockColor) as List?)
-        ?.cast<String>();
+    final list = _setting.get(SettingBoxKey.blockColor) as List?;
+    if (list == null) {
+      return SegmentType.values.map((i) => i.color).toList();
+    }
     return SegmentType.values.map(
       (item) {
-        final e = list?[item.index];
-        final color = e != null && e.isNotEmpty
-            ? int.tryParse('FF$e', radix: 16)
-            : null;
+        final String e = list[item.index];
+        final color = e.isNotEmpty ? int.tryParse('FF$e', radix: 16) : null;
         return color != null ? Color(color) : item.color;
       },
     ).toList();
@@ -213,7 +214,7 @@ class Pref {
 
   static int get defaultVideoQa => _setting.get(
     SettingBoxKey.defaultVideoQa,
-    defaultValue: VideoQuality.values.last.code,
+    defaultValue: VideoQuality.super8k.code,
   );
 
   static int get defaultVideoQaCellular => _setting.get(
@@ -223,7 +224,7 @@ class Pref {
 
   static int get defaultAudioQa => _setting.get(
     SettingBoxKey.defaultAudioQa,
-    defaultValue: AudioQuality.values.last.code,
+    defaultValue: AudioQuality.hiRes.code,
   );
 
   static int get defaultAudioQaCellular => _setting.get(
@@ -233,17 +234,19 @@ class Pref {
 
   static String get defaultDecode => _setting.get(
     SettingBoxKey.defaultDecode,
-    defaultValue: VideoDecodeFormatType.values.last.code,
+    defaultValue: VideoDecodeFormatType.values.last.codes.first,
   );
 
   static String get secondDecode => _setting.get(
     SettingBoxKey.secondDecode,
-    defaultValue: VideoDecodeFormatType.AV1.code,
+    defaultValue: VideoDecodeFormatType.AV1.codes.first,
   );
 
   static String get hardwareDecoding => _setting.get(
     SettingBoxKey.hardwareDecoding,
-    defaultValue: Platform.isAndroid ? 'auto-safe' : 'auto',
+    defaultValue: Platform.isAndroid
+        ? HwDecType.autoSafe.hwdec
+        : HwDecType.auto.hwdec,
   );
 
   static String get videoSync =>
@@ -552,9 +555,8 @@ class Pref {
   static bool get optTabletNav =>
       _setting.get(SettingBoxKey.optTabletNav, defaultValue: true);
 
-  static bool get horizontalScreen {
-    return _setting.get(SettingBoxKey.horizontalScreen) ?? isTablet;
-  }
+  static bool get horizontalScreen =>
+      _setting.get(SettingBoxKey.horizontalScreen) ?? isTablet;
 
   static bool get isTablet {
     bool isTablet;
@@ -563,9 +565,9 @@ class Pref {
     } else {
       final view = WidgetsBinding.instance.platformDispatcher.views.first;
       final screenSize = view.physicalSize / view.devicePixelRatio;
-      final shortestSide = min(screenSize.width.abs(), screenSize.height.abs());
-      isTablet = shortestSide >= 600;
+      isTablet = screenSize.shortestSide >= 600;
     }
+    _setting.put(SettingBoxKey.horizontalScreen, isTablet);
     return isTablet;
   }
 
@@ -619,11 +621,6 @@ class Pref {
   static bool get enableVerticalExpand =>
       _setting.get(SettingBoxKey.enableVerticalExpand, defaultValue: false);
 
-  static bool get removeSafeArea => _setting.get(
-    SettingBoxKey.videoPlayerRemoveSafeArea,
-    defaultValue: false,
-  );
-
   static double get defaultTextScale =>
       _setting.get(SettingBoxKey.defaultTextScale, defaultValue: 1.0);
 
@@ -674,9 +671,6 @@ class Pref {
   static bool get enableHttp2 =>
       _setting.get(SettingBoxKey.enableHttp2, defaultValue: false);
 
-  static bool get enableRcmdDynamic =>
-      _setting.get(SettingBoxKey.enableRcmdDynamic, defaultValue: true);
-
   static int get replySortType =>
       _setting.get(SettingBoxKey.replySortType, defaultValue: 1);
 
@@ -711,11 +705,9 @@ class Pref {
   static bool get enableHA =>
       _setting.get(SettingBoxKey.enableHA, defaultValue: true);
 
-  static Set<int> get danmakuBlockType =>
-      (_setting.get(SettingBoxKey.danmakuBlockType, defaultValue: <int>[])
-              as Iterable)
-          .cast<int>()
-          .toSet();
+  static Set<int> get danmakuBlockType => Set<int>.from(
+    _setting.get(SettingBoxKey.danmakuBlockType, defaultValue: const <int>{}),
+  );
 
   static int get danmakuWeight =>
       _setting.get(SettingBoxKey.danmakuWeight, defaultValue: 0);
@@ -811,4 +803,42 @@ class Pref {
     }
     return null;
   }
+
+  static bool get showFsScreenshotBtn =>
+      _setting.get(SettingBoxKey.showFsScreenshotBtn, defaultValue: true);
+
+  static bool get showFsLockBtn =>
+      _setting.get(SettingBoxKey.showFsLockBtn, defaultValue: true);
+
+  static bool get silentDownImg =>
+      _setting.get(SettingBoxKey.silentDownImg, defaultValue: false);
+
+  static String get buvid {
+    String? buvid = _localCache.get(LocalCacheKey.buvid);
+    if (buvid == null) {
+      buvid = LoginUtils.generateBuvid();
+      _localCache.put(LocalCacheKey.buvid, buvid);
+    }
+    return buvid;
+  }
+
+  static bool get showMemberShop =>
+      _setting.get(SettingBoxKey.showMemberShop, defaultValue: false);
+
+  static bool get showSuperChat =>
+      _setting.get(SettingBoxKey.showSuperChat, defaultValue: true);
+
+  static bool get minimizeOnExit =>
+      _setting.get(SettingBoxKey.minimizeOnExit, defaultValue: true);
+
+  static List<double> get windowSize => _setting.get(
+    SettingBoxKey.windowSize,
+    defaultValue: const [1180.0, 720.0],
+  );
+
+  static List<double>? get windowPosition =>
+      _setting.get(SettingBoxKey.windowPosition);
+
+  static bool get isWindowMaximized =>
+      _setting.get(SettingBoxKey.isWindowMaximized, defaultValue: false);
 }
