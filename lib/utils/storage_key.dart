@@ -220,7 +220,7 @@ abstract class LocalCacheKey {
       danmakuFilterRules = 'danmakuFilterRules',
       mixinKey = 'mixinKey',
       timeStamp = 'timeStamp',
-      starUsers = 'starUsers';
+      starUsers = 'starUsers',
       buvid = 'buvid';
 }
 
