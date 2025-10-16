@@ -2,13 +2,13 @@ name: Android Release
 
 on:
   pull_request:
-        types:
-          - opened
-          - synchronize
-          - reopened
-          - ready_for_review
-        paths-ignore:
-          - '**.md'
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths-ignore:
+      - "**.md"
   workflow_dispatch:
 
 jobs:
@@ -17,37 +17,34 @@ jobs:
 
     steps:
       - name: 代码迁出
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: 构建Java环境
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: "zulu"
           java-version: "17"
-
-      - name: 检查缓存
-        uses: actions/cache@v4
-        id: cache-flutter
-        with:
-          path: /root/flutter-sdk # Flutter SDK 的路径
-          key: ${{ runner.os }}-flutter-${{ hashFiles('**/pubspec.lock') }}
+          cache: "gradle"
+          cache-dependency-path: |
+            android/*.gradle*
+            android/**/gradle-wrapper.properties
 
       - name: 安装Flutter
-        if: steps.cache-flutter.outputs.cache-hit != 'true'
         uses: subosito/flutter-action@v2
+        id: flutter-action
         with:
           channel: stable
           flutter-version-file: pubspec.yaml
+          cache: true
 
-      - name: 下载项目依赖
-        run: flutter pub get
+      - name: apply bottom sheet patch
+        working-directory: ${{ env.FLUTTER_ROOT }}
+        run: git apply $GITHUB_WORKSPACE/lib/scripts/bottom_sheet_patch.diff
 
-      - name: 更新版本号
-        run: |
-          version_name=$(yq e .version pubspec.yaml | cut -d "+" -f 1)
-          sed -i "s/version: .*/version: $version_name-$(git rev-parse --short HEAD)+$(git rev-list --count HEAD)/g" pubspec.yaml
+      # - name: 下载项目依赖
+      #   run: flutter pub get
 
       - name: Write key
         if: github.event_name != 'pull_request'
@@ -60,11 +57,12 @@ jobs:
             echo keyPassword='${{ secrets.KEY_PASSWORD }}' >> android/key.properties
           fi
 
+      - name: Set and Extract version
+        shell: pwsh
+        run: lib/scripts/build.ps1 android
+
       - name: flutter build apk
-        run: |
-          chmod +x lib/scripts/build.dart
-          dart lib/scripts/build.dart
-          flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --dart-define-from-file=pili_release.json --pub
 
       - name: 上传
         uses: actions/upload-artifact@v4

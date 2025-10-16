@@ -157,8 +157,8 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
         return;
       }
       var result = await MemberHttp.memberCardInfo(mid: mid);
-      if (result['status']) {
-        userStat.value = result['data'];
+      if (result.isSuccess) {
+        userStat.value = result.data;
       }
     }
   }
@@ -273,7 +273,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
 
   // 投币
   @override
-  Future<void> actionCoinVideo() async {
+  void actionCoinVideo() {
     if (!accountService.isLogin.value) {
       SmartDialog.showToast('账号未登录');
       return;
@@ -298,7 +298,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
   }
 
   @override
-  (Object, int) getFavRidType() => (IdUtils.bv2av(bvid), 2);
+  (Object, int) get getFavRidType => (IdUtils.bv2av(bvid), 2);
 
   @override
   StatDetail? getStat() => videoDetail.value.stat;
@@ -339,21 +339,22 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
                   PageUtils.launchURL(videoUrl);
                 },
               ),
-              ListTile(
-                dense: true,
-                title: const Text(
-                  '分享视频',
-                  style: TextStyle(fontSize: 14),
+              if (Utils.isMobile)
+                ListTile(
+                  dense: true,
+                  title: const Text(
+                    '分享视频',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  onTap: () {
+                    Get.back();
+                    Utils.shareText(
+                      '${videoDetail.title} '
+                      'UP主: ${videoDetail.owner!.name!}'
+                      ' - $videoUrl',
+                    );
+                  },
                 ),
-                onTap: () {
-                  Get.back();
-                  Utils.shareText(
-                    '${videoDetail.title} '
-                    'UP主: ${videoDetail.owner!.name!}'
-                    ' - $videoUrl',
-                  );
-                },
-              ),
               ListTile(
                 dense: true,
                 title: const Text(
@@ -463,7 +464,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
   }
 
   // 修改分P或番剧分集
-  Future<void> onChangeEpisode(
+  Future<bool> onChangeEpisode(
     BaseEpisodeItem episode, {
     bool isStein = false,
   }) async {
@@ -473,7 +474,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
       final int? cid =
           episode.cid ?? await SearchHttp.ab2c(aid: aid, bvid: bvid);
       if (cid == null) {
-        return;
+        return false;
       }
       final String? cover = episode.cover;
 
@@ -488,7 +489,7 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
             cid: cid,
             cover: cover,
           );
-          return;
+          return false;
         }
       }
 
@@ -546,8 +547,10 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
 
       this.cid.value = cid;
       queryOnlineTotal();
+      return true;
     } catch (e) {
       if (kDebugMode) debugPrint('ugc onChangeEpisode: $e');
+      return false;
     }
   }
 
@@ -652,6 +655,10 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
           videoDetailCtr.plPlayerController.playRepeat;
 
       if (episodes.isEmpty) {
+        if (playRepeat == PlayRepeat.listCycle) {
+          videoDetailCtr.plPlayerController.play(repeat: true);
+          return true;
+        }
         if (playRepeat == PlayRepeat.autoPlayRelated &&
             videoDetailCtr.plPlayerController.showRelatedVideo) {
           return playRelated();

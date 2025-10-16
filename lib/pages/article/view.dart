@@ -558,8 +558,8 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
               alignment: Alignment.bottomRight,
               child: Padding(
                 padding: EdgeInsets.only(
-                  right: 14,
-                  bottom: padding.bottom + 14,
+                  right: kFloatingActionButtonMargin,
+                  bottom: padding.bottom + kFloatingActionButtonMargin,
                 ),
                 child: replyButton,
               ),
@@ -602,8 +602,10 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
 
             Widget btn = Padding(
               padding: EdgeInsets.only(
-                right: 14,
-                bottom: 14 + (stats != null ? 0 : padding.bottom),
+                right: kFloatingActionButtonMargin,
+                bottom:
+                    kFloatingActionButtonMargin +
+                    (stats != null ? 0 : padding.bottom),
               ),
               child: replyButton,
             );
@@ -682,7 +684,7 @@ class _ArticlePageState extends CommonDynPageState<ArticlePage> {
                       Expanded(
                         child: textIconButton(
                           text: '分享',
-                          icon: CustomIcon.share_node,
+                          icon: CustomIcons.share_node,
                           stat: null,
                           onPressed: () => Utils.shareText(controller.url),
                         ),

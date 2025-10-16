@@ -11,6 +11,7 @@ import 'package:PiliPlus/models_new/media_list/media_list.dart';
 import 'package:PiliPlus/models_new/video/video_detail/episode.dart';
 import 'package:PiliPlus/pages/common/slide/common_slide_page.dart';
 import 'package:PiliPlus/utils/duration_utils.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart' hide RefreshCallback;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -74,19 +75,19 @@ class _MediaListPanelState extends State<MediaListPanel>
             title: Text(widget.panelTitle ?? '稍后再看'),
             backgroundColor: Colors.transparent,
             actions: [
-              mediumButton(
+              iconButton(
                 tooltip: widget.desc ? '顺序播放' : '倒序播放',
                 icon: widget.desc
-                    ? MdiIcons.sortAscending
-                    : MdiIcons.sortDescending,
+                    ? const Icon(MdiIcons.sortAscending)
+                    : const Icon(MdiIcons.sortDescending),
                 onPressed: () {
                   Get.back();
                   widget.onReverse();
                 },
               ),
-              mediumButton(
+              iconButton(
                 tooltip: '关闭',
-                icon: Icons.close,
+                icon: const Icon(Icons.close),
                 onPressed: Get.back,
               ),
               const SizedBox(width: 14),
@@ -154,6 +155,12 @@ class _MediaListPanelState extends State<MediaListPanel>
     bool isCurr,
     bool showDelBtn,
   ) {
+    void onLongPress() => imageSaveDialog(
+      title: item.title,
+      cover: item.cover,
+      aid: item.aid,
+      bvid: item.bvid,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: SizedBox(
@@ -169,12 +176,8 @@ class _MediaListPanelState extends State<MediaListPanel>
               Get.back();
               widget.onChangeEpisode(item);
             },
-            onLongPress: () => imageSaveDialog(
-              title: item.title,
-              cover: item.cover,
-              aid: item.aid,
-              bvid: item.bvid,
-            ),
+            onLongPress: onLongPress,
+            onSecondaryTap: Utils.isMobile ? null : onLongPress,
             child: Stack(
               clipBehavior: Clip.none,
               children: [

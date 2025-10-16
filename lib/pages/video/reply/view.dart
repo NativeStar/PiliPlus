@@ -2,7 +2,6 @@ import 'package:PiliPlus/common/skeleton/video_reply.dart';
 import 'package:PiliPlus/common/widgets/custom_sliver_persistent_header_delegate.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
-import 'package:PiliPlus/common/widgets/scaffold/bottom_sheet.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 import 'package:PiliPlus/http/loading_state.dart';
@@ -11,7 +10,8 @@ import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
 import 'package:PiliPlus/pages/video/reply_reply/view.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:easy_debounce/easy_throttle.dart';
-import 'package:flutter/material.dart' hide showBottomSheet;
+import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:get/get.dart';
 
@@ -56,35 +56,7 @@ class _VideoReplyPanelState extends State<VideoReplyPanel>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _videoReplyController.showFab();
-    if (widget.isNested) {
-      _videoReplyController.scrollController.removeListener(listener);
-    } else {
-      _videoReplyController.scrollController.addListener(listener);
-    }
     bottom = MediaQuery.viewPaddingOf(context).bottom;
-  }
-
-  @override
-  void dispose() {
-    if (!widget.isNested) {
-      _videoReplyController.scrollController.removeListener(listener);
-    }
-    super.dispose();
-  }
-
-  void listener() {
-    final ScrollDirection direction =
-        _videoReplyController.scrollController.position.userScrollDirection;
-    if (direction == ScrollDirection.forward) {
-      if (mounted) {
-        _videoReplyController.showFab();
-      }
-    } else if (direction == ScrollDirection.reverse) {
-      if (mounted) {
-        _videoReplyController.hideFab();
-      }
-    }
   }
 
   late double bottom;
@@ -93,96 +65,114 @@ class _VideoReplyPanelState extends State<VideoReplyPanel>
   Widget build(BuildContext context) {
     super.build(context);
     final theme = Theme.of(context);
-    return refreshIndicator(
-      onRefresh: _videoReplyController.onRefresh,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          CustomScrollView(
-            controller: widget.isNested
-                ? null
-                : _videoReplyController.scrollController,
-            physics: widget.isNested
-                ? const AlwaysScrollableScrollPhysics(
-                    parent: ClampingScrollPhysics(),
-                  )
-                : const AlwaysScrollableScrollPhysics(),
-            key: const PageStorageKey<String>('评论'),
-            slivers: <Widget>[
-              SliverPersistentHeader(
-                pinned: false,
-                floating: true,
-                delegate: CustomSliverPersistentHeaderDelegate(
-                  extent: 40,
-                  bgColor: theme.colorScheme.surface,
-                  child: Container(
-                    height: 40,
-                    padding: const EdgeInsets.fromLTRB(12, 0, 6, 0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Obx(
-                          () => Text(
-                            _videoReplyController.sortType.value.title,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                        SizedBox(
-                          height: 35,
-                          child: TextButton.icon(
-                            onPressed: _videoReplyController.queryBySort,
-                            icon: Icon(
-                              Icons.sort,
-                              size: 16,
-                              color: theme.colorScheme.secondary,
+    final child = NotificationListener<UserScrollNotification>(
+      onNotification: (notification) {
+        final direction = notification.direction;
+        if (direction == ScrollDirection.forward) {
+          _videoReplyController.showFab();
+        } else if (direction == ScrollDirection.reverse) {
+          _videoReplyController.hideFab();
+        }
+        return false;
+      },
+      child: refreshIndicator(
+        onRefresh: _videoReplyController.onRefresh,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            CustomScrollView(
+              controller: widget.isNested
+                  ? null
+                  : _videoReplyController.scrollController,
+              physics: widget.isNested
+                  ? const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    )
+                  : const AlwaysScrollableScrollPhysics(),
+              key: const PageStorageKey<String>('评论'),
+              slivers: <Widget>[
+                SliverPersistentHeader(
+                  pinned: false,
+                  floating: true,
+                  delegate: CustomSliverPersistentHeaderDelegate(
+                    extent: 40,
+                    bgColor: theme.colorScheme.surface,
+                    child: Container(
+                      height: 40,
+                      padding: const EdgeInsets.fromLTRB(12, 0, 6, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Obx(
+                            () => Text(
+                              _videoReplyController.sortType.value.title,
+                              style: const TextStyle(fontSize: 13),
                             ),
-                            label: Obx(
-                              () => Text(
-                                _videoReplyController.sortType.value.label,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: theme.colorScheme.secondary,
+                          ),
+                          SizedBox(
+                            height: 35,
+                            child: TextButton.icon(
+                              onPressed: _videoReplyController.queryBySort,
+                              icon: Icon(
+                                Icons.sort,
+                                size: 16,
+                                color: theme.colorScheme.secondary,
+                              ),
+                              label: Obx(
+                                () => Text(
+                                  _videoReplyController.sortType.value.label,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: theme.colorScheme.secondary,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Obx(
-                () => _buildBody(
-                  theme,
-                  _videoReplyController.loadingState.value,
+                Obx(
+                  () => _buildBody(
+                    theme,
+                    _videoReplyController.loadingState.value,
+                  ),
+                ),
+              ],
+            ),
+            Positioned(
+              right: kFloatingActionButtonMargin,
+              bottom: kFloatingActionButtonMargin + bottom,
+              child: SlideTransition(
+                position: _videoReplyController.anim,
+                child: FloatingActionButton(
+                  heroTag: null,
+                  onPressed: () {
+                    feedBack();
+                    _videoReplyController.onReply(
+                      context,
+                      oid: _videoReplyController.aid,
+                      replyType: _videoReplyController.videoType.replyType,
+                    );
+                  },
+                  tooltip: '发表评论',
+                  child: const Icon(Icons.reply),
                 ),
               ),
-            ],
-          ),
-          Positioned(
-            right: 14,
-            bottom: 14 + bottom,
-            child: SlideTransition(
-              position: _videoReplyController.anim,
-              child: FloatingActionButton(
-                heroTag: null,
-                onPressed: () {
-                  feedBack();
-                  _videoReplyController.onReply(
-                    context,
-                    oid: _videoReplyController.aid,
-                    replyType: _videoReplyController.videoType.replyType,
-                  );
-                },
-                tooltip: '发表评论',
-                child: const Icon(Icons.reply),
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+    if (widget.isNested) {
+      return ExtendedVisibilityDetector(
+        uniqueKey: const Key('reply-list'),
+        child: child,
+      );
+    }
+    return child;
   }
 
   Widget _buildBody(

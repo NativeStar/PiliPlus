@@ -170,8 +170,7 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
                     body: refreshIndicator(
                       onRefresh: controller.onRefresh,
                       child: CustomScrollView(
-                        controller: controller
-                            .scrollController, // debug: The provided ScrollController is attached to more than one ScrollPosition.
+                        controller: scrollController,
                         physics: const AlwaysScrollableScrollPhysics(),
                         slivers: [
                           buildReplyHeader(theme),
@@ -242,7 +241,10 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(right: 14, bottom: 14),
+                    padding: const EdgeInsets.only(
+                      right: kFloatingActionButtonMargin,
+                      bottom: kFloatingActionButtonMargin,
+                    ),
                     child: replyButton,
                   ),
                   Container(
@@ -286,7 +288,7 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
                         // ),
                         Expanded(
                           child: textIconButton(
-                            icon: CustomIcon.share_node,
+                            icon: CustomIcons.share_node,
                             text: '分享',
                             onPressed: () =>
                                 Utils.shareText(controller.shareUrl),
@@ -336,8 +338,8 @@ class _MusicDetailPageState extends CommonDynPageState<MusicDetailPage> {
                 alignment: Alignment.bottomRight,
                 child: Padding(
                   padding: EdgeInsets.only(
-                    right: 14,
-                    bottom: padding.bottom + 14,
+                    right: kFloatingActionButtonMargin,
+                    bottom: padding.bottom + kFloatingActionButtonMargin,
                   ),
                   child: replyButton,
                 ),

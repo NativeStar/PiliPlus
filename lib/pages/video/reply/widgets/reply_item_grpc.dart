@@ -71,13 +71,32 @@ class ReplyItemGrpc extends StatelessWidget {
   final VoidCallback? jumpToDialogue;
 
   static final _voteRegExp = RegExp(r"^\{vote:\d+?\}$");
-  static final _timeRegExp = RegExp(r'^\b(?:\d+[:：])?\d+[:：]\d+\b$');
+  static final _timeRegExp = RegExp(r'^(?:\d+[:：])?\d+[:：]\d+$');
   static bool enableWordRe = Pref.enableWordRe;
   static int? replyLengthLimit = Pref.replyLengthLimit;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+
+    final isMobile = Utils.isMobile;
+    void showMore() => showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxWidth: min(640, context.mediaQueryShortestSide),
+      ),
+      builder: (context) {
+        return morePanel(
+          context: context,
+          item: replyItem,
+          onDelete: () => onDelete?.call(replyItem, null),
+          isSubReply: false,
+        );
+      },
+    );
+
     return Material(
       type: MaterialType.transparency,
       child: InkWell(
@@ -87,23 +106,9 @@ class ReplyItemGrpc extends StatelessWidget {
         },
         onLongPress: () {
           feedBack();
-          showModalBottomSheet(
-            context: context,
-            useSafeArea: true,
-            isScrollControlled: true,
-            constraints: BoxConstraints(
-              maxWidth: min(640, context.mediaQueryShortestSide),
-            ),
-            builder: (context) {
-              return morePanel(
-                context: context,
-                item: replyItem,
-                onDelete: () => onDelete?.call(replyItem, null),
-                isSubReply: false,
-              );
-            },
-          );
+          showMore();
         },
+        onSecondaryTap: isMobile ? null : showMore,
         child: _buildContent(context, theme),
       ),
     );
@@ -473,28 +478,30 @@ class ReplyItemGrpc extends StatelessWidget {
                     padding = const EdgeInsets.fromLTRB(8, 4, 8, 4);
                   }
                 }
+                void showMore() => showModalBottomSheet(
+                  context: context,
+                  useSafeArea: true,
+                  isScrollControlled: true,
+                  constraints: BoxConstraints(
+                    maxWidth: min(640, context.mediaQueryShortestSide),
+                  ),
+                  builder: (context) {
+                    return morePanel(
+                      context: context,
+                      item: childReply,
+                      onDelete: () => onDelete?.call(replyItem, index),
+                      isSubReply: true,
+                    );
+                  },
+                );
                 return InkWell(
                   onTap: () =>
                       replyReply?.call(replyItem, childReply.id.toInt()),
                   onLongPress: () {
                     feedBack();
-                    showModalBottomSheet(
-                      context: context,
-                      useSafeArea: true,
-                      isScrollControlled: true,
-                      constraints: BoxConstraints(
-                        maxWidth: min(640, context.mediaQueryShortestSide),
-                      ),
-                      builder: (context) {
-                        return morePanel(
-                          context: context,
-                          item: childReply,
-                          onDelete: () => onDelete?.call(replyItem, index),
-                          isSubReply: true,
-                        );
-                      },
-                    );
+                    showMore();
                   },
+                  onSecondaryTap: Utils.isMobile ? null : showMore,
                   child: Padding(
                     padding: padding,
                     child: Text.rich(
@@ -608,8 +615,8 @@ class ReplyItemGrpc extends StatelessWidget {
     ];
     String patternStr = [
       ...specialTokens.map(RegExp.escape),
-      r'(\b(?:\d+[:：])?\d+[:：]\d+\b)',
-      r'(\{vote:\d+?\})',
+      r'(?:\d+[:：])?\d+[:：]\d+',
+      r'\{vote:\d+?\}',
       Constants.urlRegex.pattern,
     ].join('|');
     final RegExp pattern = RegExp(patternStr);
@@ -877,9 +884,8 @@ class ReplyItemGrpc extends StatelessWidget {
           InkWell(
             onTap: Get.back,
             borderRadius: StyleString.bottomSheetRadius,
-            child: Container(
+            child: SizedBox(
               height: 35,
-              padding: const EdgeInsets.only(bottom: 2),
               child: Center(
                 child: Container(
                   width: 32,
@@ -1048,7 +1054,7 @@ class ReplyItemGrpc extends StatelessWidget {
             leading: const Icon(Icons.save_alt, size: 19),
             title: Text('保存评论', style: style),
           ),
-          if (item.mid == ownerMid)
+          if (kDebugMode || item.mid == ownerMid)
             ListTile(
               onTap: () {
                 Get.back();

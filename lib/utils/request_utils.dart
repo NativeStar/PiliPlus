@@ -24,6 +24,7 @@ import 'package:PiliPlus/pages/group_panel/view.dart';
 import 'package:PiliPlus/pages/later/controller.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/context_ext.dart';
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
@@ -285,7 +286,7 @@ abstract class RequestUtils {
   static Future<void> insertCreatedDyn(dynamic id) async {
     try {
       if (id != null) {
-        await Future.delayed(const Duration(milliseconds: 200));
+        await Future.delayed(const Duration(milliseconds: 450));
         var res = await DynamicsHttp.dynamicDetail(id: id);
         if (res.isSuccess) {
           final ctr = Get.find<DynamicsTabController>(tag: 'all');
@@ -317,31 +318,36 @@ abstract class RequestUtils {
             await Future.delayed(const Duration(seconds: 5));
           }
           var res = await DynamicsHttp.dynamicDetail(id: id, clearCookie: true);
-          bool isBan = !res.isSuccess;
+          final isSuccess = res.isSuccess;
           Get.dialog(
+            barrierDismissible: isManual,
             AlertDialog(
               title: const Text('动态检查结果'),
               content: SelectableText(
-                '${!isBan ? '无账号状态下找到了你的动态，动态正常！' : '你的动态被shadow ban（仅自己可见）！'}${dynText != null ? ' \n\n动态内容: $dynText' : ''}',
+                '${isSuccess ? '无账号状态下找到了你的动态，动态正常！' : '你的动态被shadow ban（仅自己可见）！'}${dynText != null ? ' \n\n动态内容: $dynText' : ''}',
               ),
-              actions: isBan
-                  ? [
-                      TextButton(
-                        onPressed: () {
-                          Get.back();
-                          Utils.copyText('https://www.bilibili.com/opus/$id');
-                          Get.toNamed(
-                            '/webview',
-                            parameters: {
-                              'url':
-                                  'https://www.bilibili.com/h5/comment/appeal?native.theme=2&night=${Get.isDarkMode ? 1 : 0}',
-                            },
-                          );
+              actions: [
+                if (!isSuccess)
+                  TextButton(
+                    onPressed: () {
+                      Get.back();
+                      Utils.copyText('https://www.bilibili.com/opus/$id');
+                      Get.toNamed(
+                        '/webview',
+                        parameters: {
+                          'url':
+                              'https://www.bilibili.com/h5/comment/appeal?native.theme=2&night=${Get.isDarkMode ? 1 : 0}',
                         },
-                        child: const Text('申诉'),
-                      ),
-                    ]
-                  : null,
+                      );
+                    },
+                    child: const Text('申诉'),
+                  ),
+                if (!isManual)
+                  TextButton(
+                    onPressed: Get.back,
+                    child: const Text('关闭'),
+                  ),
+              ],
             ),
           );
         }
@@ -613,5 +619,29 @@ abstract class RequestUtils {
         },
       )
       ..startCaptcha(registerData);
+  }
+
+  static Future<void> showUserRealName(String mid) async {
+    final res = await UserHttp.getUserRealName(mid);
+    if (res.isSuccess) {
+      final data = res.data;
+      final show = !data.name.isNullOrEmpty;
+      Get.dialog(
+        AlertDialog(
+          title: SelectableText(
+            show ? data.name! : data.rejectPage?.title ?? '',
+          ),
+          content: show ? null : Text(data.rejectPage?.text ?? ''),
+          actions: [
+            TextButton(
+              onPressed: Get.back,
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      res.toast();
+    }
   }
 }

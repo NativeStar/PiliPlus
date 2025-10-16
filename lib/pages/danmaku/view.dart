@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:PiliPlus/grpc/bilibili/community/service/dm/v1.pb.dart';
 import 'package:PiliPlus/pages/danmaku/controller.dart';
+import 'package:PiliPlus/pages/danmaku/dnamaku_model.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/utils/danmaku_utils.dart';
@@ -32,7 +33,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
   PlPlayerController get playerController => widget.playerController;
 
   late PlDanmakuController _plDanmakuController;
-  DanmakuController? _controller;
+  DanmakuController<DanmakuExtra>? _controller;
   int latestAddedPosition = -1;
 
   @override
@@ -105,6 +106,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
     List<DanmakuElem>? currentDanmakuList = _plDanmakuController
         .getCurrentDanmaku(currentPosition);
     if (currentDanmakuList != null) {
+      final blockColorful = playerController.blockColorful;
       for (DanmakuElem e in currentDanmakuList) {
         if (e.mode == 7) {
           try {
@@ -120,17 +122,16 @@ class _PlDanmakuState extends State<PlDanmaku> {
           _controller!.addDanmaku(
             DanmakuContentItem(
               e.content,
-              color: playerController.blockTypes.contains(6)
+              color: blockColorful
                   ? Colors.white
                   : DmUtils.decimalToColor(e.color),
               type: DmUtils.getPosition(e.mode),
               isColorful:
                   playerController.showVipDanmaku &&
-                      e.colorful == DmColorfulType.VipGradualColor
-                  ? true
-                  : null,
+                  e.colorful == DmColorfulType.VipGradualColor,
               count: e.hasCount() ? e.count : null,
               selfSend: e.isSelf,
+              extra: VideoDanmaku(id: e.id.toInt(), mid: e.midHash),
             ),
           );
         }
@@ -151,17 +152,18 @@ class _PlDanmakuState extends State<PlDanmaku> {
   Widget build(BuildContext context) {
     return Obx(
       () => AnimatedOpacity(
-        opacity: playerController.enableShowDanmaku.value ? 1 : 0,
+        opacity: playerController.enableShowDanmaku.value
+            ? playerController.danmakuOpacity.value
+            : 0,
         duration: const Duration(milliseconds: 100),
-        child: DanmakuScreen(
-          createdController: (DanmakuController e) {
+        child: DanmakuScreen<DanmakuExtra>(
+          createdController: (e) {
             playerController.danmakuController = _controller = e;
           },
           option: DanmakuOption(
             fontSize: _fontSize,
-            fontWeight: playerController.fontWeight,
+            fontWeight: playerController.danmakuFontWeight,
             area: playerController.showArea,
-            opacity: playerController.danmakuOpacity,
             hideTop: playerController.blockTypes.contains(5),
             hideScroll: playerController.blockTypes.contains(2),
             hideBottom: playerController.blockTypes.contains(4),
@@ -171,7 +173,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
             staticDuration:
                 playerController.danmakuStaticDuration /
                 playerController.playbackSpeed,
-            strokeWidth: playerController.strokeWidth,
+            strokeWidth: playerController.danmakuStrokeWidth,
             lineHeight: playerController.danmakuLineHeight,
           ),
         ),

@@ -29,6 +29,7 @@ import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
+import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide TabBarView;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -74,7 +75,7 @@ class EpisodePanel extends CommonSlidePage {
   final int initialTabIndex;
   final bool? isSupportReverse;
   final bool? isReversed;
-  final ValueChanged<ugc.BaseEpisodeItem> onChangeEpisode;
+  final Future<bool> Function(ugc.BaseEpisodeItem) onChangeEpisode;
   final VoidCallback? onReverse;
   final VoidCallback? onClose;
 
@@ -414,6 +415,12 @@ class _EpisodePanelState extends State<EpisodePanel>
     }
     late final Color primary = theme.colorScheme.primary;
 
+    void onLongPress() {
+      if (cover?.isNotEmpty == true) {
+        imageSaveDialog(title: title, cover: cover, bvid: bvid);
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: SizedBox(
@@ -432,25 +439,26 @@ class _EpisodePanelState extends State<EpisodePanel>
               }
               SmartDialog.showToast('切换到：$title');
               widget.onClose?.call();
-              if (!showTitle) {
-                _currentItemIndex = index;
-              }
-              widget.onChangeEpisode(episode);
-              if (widget.type == EpisodeType.season) {
-                try {
-                  Get.find<VideoDetailController>(
-                    tag: widget.ugcIntroController!.heroTag,
-                  ).seasonCid = episode.cid;
-                } catch (_) {
-                  if (kDebugMode) rethrow;
+
+              widget.onChangeEpisode(episode).then((res) {
+                if (res) {
+                  if (!showTitle) {
+                    _currentItemIndex = index;
+                  }
+                  if (widget.type == EpisodeType.season) {
+                    try {
+                      Get.find<VideoDetailController>(
+                        tag: widget.ugcIntroController!.heroTag,
+                      ).seasonCid = episode.cid;
+                    } catch (_) {
+                      if (kDebugMode) rethrow;
+                    }
+                  }
                 }
-              }
+              });
             },
-            onLongPress: () {
-              if (cover?.isNotEmpty == true) {
-                imageSaveDialog(title: title, cover: cover, bvid: bvid);
-              }
-            },
+            onLongPress: onLongPress,
+            onSecondaryTap: Utils.isMobile ? null : onLongPress,
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: StyleString.safeSpace,
@@ -566,11 +574,12 @@ class _EpisodePanelState extends State<EpisodePanel>
 
   Widget _buildFavBtn(LoadingState<bool> loadingState) {
     return switch (loadingState) {
-      Success(:var response) => mediumButton(
+      Success(:var response) => iconButton(
+        iconSize: 22,
         tooltip: response ? '取消订阅' : '订阅',
         icon: response
-            ? Icons.notifications_off_outlined
-            : Icons.notifications_active_outlined,
+            ? const Icon(Icons.notifications_off_outlined)
+            : const Icon(Icons.notifications_active_outlined),
         onPressed: () async {
           var result = await FavHttp.seasonFav(
             isFav: response,
@@ -588,11 +597,12 @@ class _EpisodePanelState extends State<EpisodePanel>
     };
   }
 
-  Widget get _buildReverseBtn => mediumButton(
+  Widget get _buildReverseBtn => iconButton(
+    iconSize: 22,
     tooltip: widget.isReversed == true ? '正序播放' : '倒序播放',
     icon: widget.isReversed == true
-        ? MdiIcons.sortDescending
-        : MdiIcons.sortAscending,
+        ? const Icon(MdiIcons.sortDescending)
+        : const Icon(MdiIcons.sortAscending),
     onPressed: () => widget.onReverse?.call(),
   );
 
@@ -624,19 +634,22 @@ class _EpisodePanelState extends State<EpisodePanel>
             style: theme.textTheme.titleMedium,
           ),
         if (_favState != null) Obx(() => _buildFavBtn(_favState!.value)),
-        mediumButton(
+        iconButton(
+          iconSize: 22,
           tooltip: '跳至顶部',
-          icon: Icons.vertical_align_top,
+          icon: const Icon(Icons.vertical_align_top),
           onPressed: _animToTopOrBottom,
         ),
-        mediumButton(
+        iconButton(
+          iconSize: 22,
           tooltip: '跳至底部',
-          icon: Icons.vertical_align_bottom,
+          icon: const Icon(Icons.vertical_align_bottom),
           onPressed: () => _animToTopOrBottom(top: false),
         ),
-        mediumButton(
+        iconButton(
+          iconSize: 22,
           tooltip: '跳至当前',
-          icon: Icons.my_location,
+          icon: const Icon(Icons.my_location),
           onPressed: () async {
             final currentTabIndex = _currentTabIndex.value;
             if (currentTabIndex != widget.initialTabIndex) {
@@ -661,11 +674,12 @@ class _EpisodePanelState extends State<EpisodePanel>
         Obx(
           () {
             final currentTabIndex = _currentTabIndex.value;
-            return mediumButton(
+            return iconButton(
+              iconSize: 22,
               tooltip: _isReversed[currentTabIndex] ? '顺序' : '倒序',
               icon: !_isReversed[currentTabIndex]
-                  ? MdiIcons.sortNumericAscending
-                  : MdiIcons.sortNumericDescending,
+                  ? const Icon(MdiIcons.sortNumericAscending)
+                  : const Icon(MdiIcons.sortNumericDescending),
               onPressed: () => setState(() {
                 _isReversed[currentTabIndex] = !_isReversed[currentTabIndex];
               }),
@@ -673,9 +687,10 @@ class _EpisodePanelState extends State<EpisodePanel>
           },
         ),
         if (widget.onClose != null)
-          mediumButton(
+          iconButton(
+            iconSize: 22,
             tooltip: '关闭',
-            icon: Icons.close,
+            icon: const Icon(Icons.close),
             onPressed: widget.onClose,
           ),
       ],

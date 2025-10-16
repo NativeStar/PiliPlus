@@ -4,7 +4,6 @@ import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/loading_widget.dart';
 import 'package:PiliPlus/common/widgets/pair.dart';
-import 'package:PiliPlus/common/widgets/progress_bar/segment_progress_bar.dart';
 import 'package:PiliPlus/http/init.dart';
 import 'package:PiliPlus/models/common/sponsor_block/action_type.dart';
 import 'package:PiliPlus/models/common/sponsor_block/post_segment_model.dart';
@@ -18,6 +17,7 @@ import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:dio/dio.dart';
+import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
@@ -76,7 +76,7 @@ class PostPanel extends CommonSlidePage {
               context: context,
               size: 26,
               tooltip: '设为当前',
-              icon: Icons.my_location,
+              icon: const Icon(Icons.my_location),
               onPressed: () {
                 updateSegment(
                   isFirst: isFirst,
@@ -90,7 +90,9 @@ class PostPanel extends CommonSlidePage {
               context: context,
               size: 26,
               tooltip: isFirst ? '视频开头' : '视频结尾',
-              icon: isFirst ? Icons.first_page : Icons.last_page,
+              icon: isFirst
+                  ? const Icon(Icons.first_page)
+                  : const Icon(Icons.last_page),
               onPressed: () {
                 updateSegment(
                   isFirst: isFirst,
@@ -104,7 +106,7 @@ class PostPanel extends CommonSlidePage {
               context: context,
               size: 26,
               tooltip: '编辑',
-              icon: Icons.edit,
+              icon: const Icon(Icons.edit),
               onPressed: () async {
                 final res = await showDialog<String>(
                   context: context,
@@ -222,7 +224,7 @@ class _PostPanelState extends State<PostPanel>
                 );
               });
             },
-            icon: Icons.add,
+            icon: const Icon(Icons.add),
           ),
           const SizedBox(width: 10),
           iconButton(
@@ -230,7 +232,7 @@ class _PostPanelState extends State<PostPanel>
             context: context,
             tooltip: '关闭',
             onPressed: Get.back,
-            icon: Icons.close,
+            icon: const Icon(Icons.close),
           ),
           const SizedBox(width: 16),
         ],
@@ -240,11 +242,14 @@ class _PostPanelState extends State<PostPanel>
   }
 
   late Key _key;
+  late bool _isNested;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _key = ValueKey(PrimaryScrollController.of(context).hashCode);
+    final controller = PrimaryScrollController.of(context);
+    _isNested = controller is ExtendedNestedScrollController;
+    _key = ValueKey(controller.hashCode);
   }
 
   @override
@@ -253,21 +258,28 @@ class _PostPanelState extends State<PostPanel>
       return errorWidget();
     }
     final bottom = MediaQuery.viewPaddingOf(context).bottom;
+    Widget child = ListView.builder(
+      key: _key,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.only(bottom: 88 + bottom),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        return _buildItem(theme, index, list[index]);
+      },
+    );
+    if (_isNested) {
+      child = ExtendedVisibilityDetector(
+        uniqueKey: const Key('post-panel'),
+        child: child,
+      );
+    }
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        ListView.builder(
-          key: _key,
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.only(bottom: 88 + bottom),
-          itemCount: list.length,
-          itemBuilder: (context, index) {
-            return _buildItem(theme, index, list[index]);
-          },
-        ),
+        child,
         Positioned(
-          right: 16,
-          bottom: 16 + bottom,
+          right: kFloatingActionButtonMargin,
+          bottom: kFloatingActionButtonMargin + bottom,
           child: FloatingActionButton(
             tooltip: '提交',
             onPressed: () => showDialog(
@@ -338,8 +350,6 @@ class _PostPanelState extends State<PostPanel>
           list.map((e) => SegmentItemModel.fromJson(e)).toList(),
         );
       }
-      plPlayerController.segmentList.value =
-          videoDetailController.segmentProgressList ?? <Segment>[];
       if (videoDetailController.positionSubscription == null) {
         videoDetailController.initSkip();
       }
@@ -486,7 +496,7 @@ class _PostPanelState extends State<PostPanel>
             context: context,
             size: 26,
             tooltip: '移除',
-            icon: Icons.clear,
+            icon: const Icon(Icons.clear),
             onPressed: () {
               setState(() {
                 list.removeAt(index);
@@ -501,7 +511,7 @@ class _PostPanelState extends State<PostPanel>
             context: context,
             size: 26,
             tooltip: '预览',
-            icon: Icons.preview_outlined,
+            icon: const Icon(Icons.preview_outlined),
             onPressed: () async {
               final videoCtr = widget.plPlayerController.videoPlayerController;
               if (videoCtr != null) {

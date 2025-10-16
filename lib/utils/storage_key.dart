@@ -24,7 +24,11 @@ abstract class SettingBoxKey {
       enableAutoEnter = 'enableAutoEnter',
       enableAutoExit = 'enableAutoExit',
       enableOnlineTotal = 'enableOnlineTotal',
-      showSuperChat = 'showSuperChat';
+      showSuperChat = 'showSuperChat',
+      keyboardControl = 'keyboardControl',
+      pauseOnMinimize = 'pauseOnMinimize',
+      pgcSkipType = 'pgcSkipType',
+      audioPlayMode = 'audioPlayMode';
 
   static const String enableVerticalExpand = 'enableVerticalExpand',
       feedBackEnable = 'feedBackEnable',
@@ -91,6 +95,7 @@ abstract class SettingBoxKey {
       refreshDisplacement = 'refreshDisplacement',
       showHotRcmd = 'showHotRcmd',
       audioNormalization = 'audioNormalization',
+      fallbackNormalization = 'fallbackNormalization',
       superResolutionType = 'superResolutionType',
       preInitPlayer = 'preInitPlayer',
       mainTabBarView = 'mainTabBarView',
@@ -135,12 +140,17 @@ abstract class SettingBoxKey {
       showFsScreenshotBtn = 'showFsScreenshotBtn',
       showFsLockBtn = 'showFsLockBtn',
       silentDownImg = 'silentDownImg',
-      showMemberShop = 'showMemberShop';
+      showMemberShop = 'showMemberShop',
+      enablePlayAll = 'enablePlayAll',
+      enableTapDm = 'enableTapDm';
 
   static const String minimizeOnExit = 'minimizeOnExit',
       windowSize = 'windowSize',
       windowPosition = 'windowPosition',
-      isWindowMaximized = 'isWindowMaximized';
+      isWindowMaximized = 'isWindowMaximized',
+      showWindowTitleBar = 'showWindowTitleBar',
+      desktopVolume = 'desktopVolume',
+      showTrayIcon = 'showTrayIcon';
 
   static const String subtitlePreferenceV2 = 'subtitlePreferenceV2',
       enableDragSubtitle = 'enableDragSubtitle',
@@ -167,6 +177,7 @@ abstract class SettingBoxKey {
       blockTrack = 'blockTrack';
 
   static const String enableShowDanmaku = 'enableShowDanmaku',
+      enableShowLiveDanmaku = 'enableShowLiveDanmaku',
       pipNoDanmaku = 'pipNoDanmaku',
       showVipDanmaku = 'showVipDanmaku',
       showSpecialDanmaku = 'showSpecialDanmaku',
