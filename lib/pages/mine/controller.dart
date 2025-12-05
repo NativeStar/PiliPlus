@@ -77,6 +77,7 @@ class MineController
           },
         ),
         (
+          size: 23,
     icon: Icons.star_border,
     title: '收藏用户',
     onTap: () {
