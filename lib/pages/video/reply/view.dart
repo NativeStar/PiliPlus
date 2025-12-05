@@ -1,7 +1,7 @@
 import 'package:PiliPlus/common/skeleton/video_reply.dart';
 import 'package:PiliPlus/common/widgets/custom_sliver_persistent_header_delegate.dart';
+import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
-import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo;
 import 'package:PiliPlus/http/loading_state.dart';
@@ -20,15 +20,11 @@ class VideoReplyPanel extends StatefulWidget {
     super.key,
     this.replyLevel = 1,
     required this.heroTag,
-    this.onViewImage,
-    this.onDismissed,
     required this.isNested,
   });
 
   final int replyLevel;
   final String heroTag;
-  final VoidCallback? onViewImage;
-  final ValueChanged<int>? onDismissed;
   final bool isNested;
 
   @override
@@ -216,8 +212,6 @@ class _VideoReplyPanelState extends State<VideoReplyPanel>
                           _videoReplyController.onRemove(index, item, subIndex),
                       upMid: _videoReplyController.upMid,
                       getTag: () => heroTag,
-                      onViewImage: widget.onViewImage,
-                      onDismissed: widget.onDismissed,
                       onCheckReply: (item) => _videoReplyController
                           .onCheckReply(item, isManual: true),
                       onToggleTop: (item) => _videoReplyController.onToggleTop(
@@ -258,8 +252,6 @@ class _VideoReplyPanelState extends State<VideoReplyPanel>
           firstFloor: replyItem,
           replyType: _videoReplyController.videoType.replyType,
           isVideoDetail: true,
-          onViewImage: widget.onViewImage,
-          onDismissed: widget.onDismissed,
           isNested: widget.isNested,
         ),
       );

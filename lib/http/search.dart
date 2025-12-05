@@ -11,6 +11,7 @@ import 'package:PiliPlus/models_new/pgc/pgc_info_model/result.dart';
 import 'package:PiliPlus/models_new/search/search_rcmd/data.dart';
 import 'package:PiliPlus/models_new/search/search_trending/data.dart';
 import 'package:PiliPlus/utils/extension.dart';
+import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/wbi_sign.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -42,7 +43,8 @@ class SearchHttp {
   }
 
   // 分类搜索
-  static Future<LoadingState<R>> searchByType<R>({
+  @pragma('vm:notify-debugger-on-exception')
+  static Future<LoadingState<R>> searchByType<R extends SearchNumData>({
     required SearchType searchType,
     required String keyword,
     required page,
@@ -54,13 +56,14 @@ class SearchHttp {
     int? categoryId,
     int? pubBegin,
     int? pubEnd,
-    required String qvId,
+    String? gaiaVtoken,
+    required ValueChanged<String> onSuccess,
   }) async {
     var params = await WbiSign.makSign({
       'search_type': searchType.name,
       'keyword': keyword,
       'page': page,
-      if (order?.isNotEmpty == true) 'order': order,
+      if (order != null && order.isNotEmpty) 'order': order,
       'duration': ?duration,
       'tids': ?tids,
       'order_sort': ?orderSort,
@@ -68,65 +71,66 @@ class SearchHttp {
       'category_id': ?categoryId,
       'pubtime_begin_s': ?pubBegin,
       'pubtime_end_s': ?pubEnd,
-      // 'ad_resource': 5654,
-      '__refresh__': true,
-      '_extra': '',
-      'context': '',
       'page_size': 20,
-      'from_source': '',
-      'from_spmid': 333.337,
       'platform': 'pc',
-      'source_tag': 3,
-      'gaia_vtoken': '',
-      'qv_id': qvId,
       'web_location': 1430654,
+      'gaia_vtoken': ?gaiaVtoken,
     });
     var res = await Request().get(
       Api.searchByType,
       queryParameters: params,
       options: Options(
         headers: {
+          if (gaiaVtoken != null) 'cookie': 'x-bili-gaia-vtoken=$gaiaVtoken',
           'origin': 'https://search.bilibili.com',
           'referer':
-              'https://search.bilibili.com/${searchType.name}?keyword=$keyword',
+              'https://search.bilibili.com/${searchType.name}?keyword=${Uri.encodeFull(keyword)}',
         },
       ),
     );
-    if (res.data is! Map) {
-      return const Error('没有相关数据');
-    }
-    if (res.data['code'] == 0) {
-      dynamic data;
-      try {
-        switch (searchType) {
-          case SearchType.video:
-            data = SearchVideoData.fromJson(res.data['data']);
-            break;
-          case SearchType.live_room:
-            data = SearchLiveData.fromJson(res.data['data']);
-            break;
-          case SearchType.bili_user:
-            data = SearchUserData.fromJson(res.data['data']);
-            break;
-          case SearchType.media_bangumi || SearchType.media_ft:
-            data = SearchPgcData.fromJson(res.data['data']);
-            break;
-          case SearchType.article:
-            data = SearchArticleData.fromJson(res.data['data']);
-            break;
-          // default:
-          //   break;
+    final resData = res.data;
+    if (resData is Map) {
+      if (resData['code'] == 0) {
+        final Map<String, dynamic> dataData = resData['data'];
+        final vVoucher = dataData['v_voucher'];
+        if (vVoucher != null) {
+          RequestUtils.validate(vVoucher, onSuccess);
+          return const Error('触发风控');
         }
-        return Success(data);
-      } catch (err) {
-        debugPrint(err.toString());
-        return Error(err.toString());
+        dynamic data;
+        try {
+          switch (searchType) {
+            case SearchType.video:
+              data = SearchVideoData.fromJson(dataData);
+              break;
+            case SearchType.live_room:
+              data = SearchLiveData.fromJson(dataData);
+              break;
+            case SearchType.bili_user:
+              data = SearchUserData.fromJson(dataData);
+              break;
+            case SearchType.media_bangumi || SearchType.media_ft:
+              data = SearchPgcData.fromJson(dataData);
+              break;
+            case SearchType.article:
+              data = SearchArticleData.fromJson(dataData);
+              break;
+            // default:
+            //   break;
+          }
+          return Success(data);
+        } catch (e, s) {
+          return Error('$e\n\n$s');
+        }
+      } else {
+        return Error(resData['message'], code: resData['code']);
       }
     } else {
-      return Error(res.data['message'] ?? '没有相关数据');
+      return const Error('服务器错误');
     }
   }
 
+  @pragma('vm:notify-debugger-on-exception')
   static Future<LoadingState<SearchAllData>> searchAll({
     required String keyword,
     required page,
@@ -142,7 +146,7 @@ class SearchHttp {
     var params = await WbiSign.makSign({
       'keyword': keyword,
       'page': page,
-      if (order?.isNotEmpty == true) 'order': order,
+      if (order != null && order.isNotEmpty) 'order': order,
       'duration': ?duration,
       'tids': ?tids,
       'order_sort': ?orderSort,
@@ -161,9 +165,8 @@ class SearchHttp {
     if (res.data['code'] == 0) {
       try {
         return Success(SearchAllData.fromJson(res.data['data']));
-      } catch (err) {
-        debugPrint(err.toString());
-        return Error(err.toString());
+      } catch (e, s) {
+        return Error('$e\n\n$s');
       }
     } else {
       return Error(res.data['message'] ?? '没有相关数据');

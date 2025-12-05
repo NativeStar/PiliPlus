@@ -70,8 +70,7 @@ class Request {
 
       String jsonData = json.encode({
         '3064': 1,
-        '39c8':
-            '${account is AnonymousAccount ? '333.1365' : '333.788'}.fp.risk',
+        '39c8': '333.1387.fp.risk',
         '3c43': {
           'adca': 'Linux',
           'bfe9': randPngEnd.substring(randPngEnd.length - 50),
@@ -81,7 +80,10 @@ class Request {
       await Request().post(
         Api.activateBuvidApi,
         data: {'payload': jsonData},
-        options: Options(contentType: Headers.jsonContentType),
+        options: Options(
+          extra: {'account': account},
+          contentType: Headers.jsonContentType,
+        ),
       );
     } catch (_) {}
   }
@@ -90,6 +92,7 @@ class Request {
    * config it and create
    */
   Request._internal() {
+    final enableHttp2 = Pref.enableHttp2;
     //BaseOptions、Options、RequestOptions 都可以配置参数，优先级别依次递增，且可以根据优先级别覆盖参数
     BaseOptions options = BaseOptions(
       //请求基地址,可以包含子路径
@@ -101,6 +104,8 @@ class Request {
       //Http请求头.
       headers: {
         'user-agent': 'Dart/3.6 (dart:io)', // Http2Adapter不会自动添加标头
+        if (!enableHttp2) 'connection': 'keep-alive',
+        'accept-encoding': 'br,gzip',
       },
       responseDecoder: _responseDecoder, // Http2Adapter没有自动解压
       persistentConnection: true,
@@ -123,31 +128,25 @@ class Request {
               ..idleTimeout = const Duration(seconds: 15)
               ..autoUncompress = false
               ..findProxy = ((_) => 'PROXY $systemProxyHost:$systemProxyPort')
-              ..badCertificateCallback =
-                  (X509Certificate cert, String host, int port) => true
+              ..badCertificateCallback = (cert, host, port) => true
           : () => HttpClient()
               ..idleTimeout = const Duration(seconds: 15)
               ..autoUncompress = false, // Http2Adapter没有自动解压, 统一行为
     );
 
-    late final Uri proxy;
-    if (enableSystemProxy) {
-      proxy = Uri(
-        scheme: 'http',
-        host: systemProxyHost,
-        port: systemProxyPort,
-      );
-    }
-
     dio = Dio(options)
-      ..httpClientAdapter = Pref.enableHttp2
+      ..httpClientAdapter = enableHttp2
           ? Http2Adapter(
               ConnectionManager(
                 idleTimeout: const Duration(seconds: 15),
                 onClientCreate: enableSystemProxy
                     ? (_, config) {
                         config
-                          ..proxy = proxy
+                          ..proxy = Uri(
+                            scheme: 'http',
+                            host: systemProxyHost,
+                            port: systemProxyPort,
+                          )
                           ..onBadCertificate = (_) => true;
                       }
                     : Pref.badCertificateCallback
@@ -174,10 +173,11 @@ class Request {
       );
     }
 
-    dio.transformer = BackgroundTransformer();
-    dio.options.validateStatus = (int? status) {
-      return status! >= 200 && status < 300;
-    };
+    dio
+      ..transformer = BackgroundTransformer()
+      ..options.validateStatus = (int? status) {
+        return status != null && status >= 200 && status < 300;
+      };
   }
 
   /*

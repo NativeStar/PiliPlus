@@ -1,5 +1,5 @@
+import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
-import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/search/search_type.dart';
 import 'package:PiliPlus/models/search/result.dart';
@@ -42,8 +42,13 @@ abstract class CommonSearchPanelState<
         controller: controller.scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          if (widget.searchType.hasHeader) buildHeader(theme),
-          Obx(() => _buildBody(theme, controller.loadingState.value)),
+          ?buildHeader(theme),
+          SliverPadding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
+            ),
+            sliver: Obx(() => _buildBody(theme, controller.loadingState.value)),
+          ),
         ],
       ),
     );
@@ -55,13 +60,8 @@ abstract class CommonSearchPanelState<
     return switch (loadingState) {
       Loading() => buildLoading,
       Success(:var response) =>
-        response?.isNotEmpty == true
-            ? SliverPadding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.viewPaddingOf(context).bottom + 100,
-                ),
-                sliver: buildList(theme, response!),
-              )
+        response != null && response.isNotEmpty
+            ? buildList(theme, response)
             : HttpError(onReload: controller.onReload),
       Error(:var errMsg) => HttpError(
         errMsg: errMsg,
@@ -70,7 +70,7 @@ abstract class CommonSearchPanelState<
     };
   }
 
-  Widget buildHeader(ThemeData theme) => throw UnimplementedError();
+  Widget? buildHeader(ThemeData theme) => null;
 
   Widget buildList(ThemeData theme, List<T> list);
 }

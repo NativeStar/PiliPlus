@@ -110,6 +110,7 @@ class AccountManager extends Interceptor {
       Api.ugcUrl,
       Api.pgcUrl,
       Api.pugvUrl,
+      Api.tvPlayUrl,
     },
   };
 
@@ -163,7 +164,9 @@ class AccountManager extends Interceptor {
       );
     }
 
-    options.headers.addAll(account.headers);
+    options.headers
+      ..addAll(account.headers)
+      ..['referer'] ??= HttpString.baseUrl;
 
     // app端不需要管理cookie
     if (path.startsWith(HttpString.appBaseUrl)) {
@@ -244,6 +247,9 @@ class AccountManager extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (err.requestOptions.responseType == ResponseType.stream) {
+      return handler.next(err);
+    }
     if (err.requestOptions.method != 'POST') {
       toast(err);
     }

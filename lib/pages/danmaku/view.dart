@@ -16,6 +16,7 @@ class PlDanmaku extends StatefulWidget {
   final PlPlayerController playerController;
   final bool isPipMode;
   final bool isFullScreen;
+  final bool isFileSource;
 
   const PlDanmaku({
     super.key,
@@ -23,6 +24,7 @@ class PlDanmaku extends StatefulWidget {
     required this.playerController,
     this.isPipMode = false,
     required this.isFullScreen,
+    required this.isFileSource,
   });
 
   @override
@@ -32,7 +34,7 @@ class PlDanmaku extends StatefulWidget {
 class _PlDanmakuState extends State<PlDanmaku> {
   PlPlayerController get playerController => widget.playerController;
 
-  late PlDanmakuController _plDanmakuController;
+  late final PlDanmakuController _plDanmakuController;
   DanmakuController<DanmakuExtra>? _controller;
   int latestAddedPosition = -1;
 
@@ -42,13 +44,18 @@ class _PlDanmakuState extends State<PlDanmaku> {
     _plDanmakuController = PlDanmakuController(
       widget.cid,
       playerController,
+      widget.isFileSource,
     );
     if (playerController.enableShowDanmaku.value) {
-      _plDanmakuController.queryDanmaku(
-        _plDanmakuController.calcSegment(
-          playerController.position.value.inMilliseconds,
-        ),
-      );
+      if (widget.isFileSource) {
+        _plDanmakuController.initFileDmIfNeeded();
+      } else {
+        _plDanmakuController.queryDanmaku(
+          PlDanmakuController.calcSegment(
+            playerController.position.value.inMilliseconds,
+          ),
+        );
+      }
     }
     playerController
       ..addStatusLister(playerListener)
@@ -83,6 +90,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
     }
   }
 
+  @pragma('vm:notify-debugger-on-exception')
   void videoPositionListen(Duration position) {
     if (_controller == null || !playerController.enableShowDanmaku.value) {
       return;
@@ -92,7 +100,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
       return;
     }
 
-    if (playerController.playerStatus.status.value != PlayerStatus.playing) {
+    if (!playerController.playerStatus.playing) {
       return;
     }
 
@@ -115,6 +123,11 @@ class _PlDanmakuState extends State<PlDanmaku> {
                 DmUtils.decimalToColor(e.color),
                 e.fontsize.toDouble(),
                 jsonDecode(e.content.replaceAll('\n', '\\n')),
+                extra: VideoDanmaku(
+                  id: e.id.toInt(),
+                  mid: e.midHash,
+                  like: e.like.toInt(),
+                ),
               ),
             );
           } catch (_) {}
@@ -129,9 +142,13 @@ class _PlDanmakuState extends State<PlDanmaku> {
               isColorful:
                   playerController.showVipDanmaku &&
                   e.colorful == DmColorfulType.VipGradualColor,
-              count: e.hasCount() ? e.count : null,
+              count: e.count > 1 ? e.count : null,
               selfSend: e.isSelf,
-              extra: VideoDanmaku(id: e.id.toInt(), mid: e.midHash),
+              extra: VideoDanmaku(
+                id: e.id.toInt(),
+                mid: e.midHash,
+                like: e.like.toInt(),
+              ),
             ),
           );
         }
@@ -167,6 +184,7 @@ class _PlDanmakuState extends State<PlDanmaku> {
             hideTop: playerController.blockTypes.contains(5),
             hideScroll: playerController.blockTypes.contains(2),
             hideBottom: playerController.blockTypes.contains(4),
+            hideSpecial: playerController.blockTypes.contains(7),
             duration:
                 playerController.danmakuDuration /
                 playerController.playbackSpeed,

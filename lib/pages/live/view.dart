@@ -2,10 +2,10 @@ import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/skeleton/video_card_v.dart';
 import 'package:PiliPlus/common/widgets/button/icon_button.dart';
 import 'package:PiliPlus/common/widgets/button/more_btn.dart';
+import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget/http_error.dart';
 import 'package:PiliPlus/common/widgets/pair.dart';
-import 'package:PiliPlus/common/widgets/refresh_indicator.dart';
 import 'package:PiliPlus/common/widgets/self_sized_horizontal_list.dart';
 import 'package:PiliPlus/http/loading_state.dart';
 import 'package:PiliPlus/models/common/image_type.dart';
@@ -17,6 +17,7 @@ import 'package:PiliPlus/pages/live/widgets/live_item_app.dart';
 import 'package:PiliPlus/pages/live_area/view.dart';
 import 'package:PiliPlus/pages/live_follow/view.dart';
 import 'package:PiliPlus/pages/search/widgets/search_text.dart';
+import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -129,6 +130,25 @@ class _LivePageState extends CommonPageState<LivePage, LiveController>
                   size: 26,
                   iconSize: 16,
                   context: context,
+                  tooltip: '游戏赛事',
+                  icon: const Icon(Icons.gamepad),
+                  onPressed: () {
+                    final isDark = theme.brightness.isDark;
+                    Get.toNamed(
+                      '/webview',
+                      parameters: {
+                        'uaType': 'mob',
+                        'url':
+                            'https://www.bilibili.com/h5/match/data/home?navhide=1&native.theme=${isDark ? 2 : 1}&night=${isDark ? 1 : 0}',
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                iconButton(
+                  size: 26,
+                  iconSize: 16,
+                  context: context,
                   tooltip: '全部标签',
                   icon: const Icon(Icons.widgets),
                   onPressed: () => Get.to(const LiveAreaPage()),
@@ -159,43 +179,44 @@ class _LivePageState extends CommonPageState<LivePage, LiveController>
       ),
       Success(:var response) => SliverMainAxisGroup(
         slivers: [
-          if (controller.newTags?.isNotEmpty == true)
-            SliverToBoxAdapter(
-              child: SelfSizedHorizontalList(
-                gapSize: 12,
-                padding: const EdgeInsets.only(bottom: 8),
-                childBuilder: (index) {
-                  late final item = controller.newTags![index];
-                  return Obx(
-                    () {
-                      final isCurr = index == controller.tagIndex.value;
-                      return SearchText(
-                        fontSize: 13,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        text: '${item.name}',
-                        bgColor: isCurr
-                            ? theme.colorScheme.secondaryContainer
-                            : Colors.transparent,
-                        textColor: isCurr
-                            ? theme.colorScheme.onSecondaryContainer
-                            : null,
-                        onTap: (value) {
-                          controller.onSelectTag(
-                            index,
-                            item.sortType,
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-                itemCount: controller.newTags!.length,
+          if (controller.newTags case final newTags?)
+            if (newTags.isNotEmpty)
+              SliverToBoxAdapter(
+                child: SelfSizedHorizontalList(
+                  gapSize: 12,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  childBuilder: (index) {
+                    late final item = newTags[index];
+                    return Obx(
+                      () {
+                        final isCurr = index == controller.tagIndex.value;
+                        return SearchText(
+                          fontSize: 13,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          text: '${item.name}',
+                          bgColor: isCurr
+                              ? theme.colorScheme.secondaryContainer
+                              : Colors.transparent,
+                          textColor: isCurr
+                              ? theme.colorScheme.onSecondaryContainer
+                              : null,
+                          onTap: (value) {
+                            controller.onSelectTag(
+                              index,
+                              item.sortType,
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                  itemCount: newTags.length,
+                ),
               ),
-            ),
-          response?.isNotEmpty == true
+          response != null && response.isNotEmpty == true
               ? SliverGrid.builder(
                   gridDelegate: gridDelegate,
                   itemBuilder: (context, index) {
@@ -210,7 +231,7 @@ class _LivePageState extends CommonPageState<LivePage, LiveController>
                     }
                     return LiveCardVApp(item: item);
                   },
-                  itemCount: response!.length,
+                  itemCount: response.length,
                 )
               : HttpError(onReload: controller.onReload),
         ],

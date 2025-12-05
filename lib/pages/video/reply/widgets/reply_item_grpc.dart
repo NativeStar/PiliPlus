@@ -3,10 +3,10 @@ import 'dart:math';
 import 'package:PiliPlus/common/constants.dart';
 import 'package:PiliPlus/common/widgets/badge.dart';
 import 'package:PiliPlus/common/widgets/dialog/report.dart';
+import 'package:PiliPlus/common/widgets/flutter/text/text.dart' as custom_text;
 import 'package:PiliPlus/common/widgets/image/custom_grid_view.dart';
 import 'package:PiliPlus/common/widgets/image/network_img_layer.dart';
 import 'package:PiliPlus/common/widgets/pendant_avatar.dart';
-import 'package:PiliPlus/common/widgets/text/text.dart' as custom_text;
 import 'package:PiliPlus/grpc/bilibili/main/community/reply/v1.pb.dart'
     show ReplyInfo, ReplyControl, Content, Url;
 import 'package:PiliPlus/http/init.dart';
@@ -50,7 +50,6 @@ class ReplyItemGrpc extends StatelessWidget {
     this.showDialogue,
     this.getTag,
     this.onViewImage,
-    this.onDismissed,
     this.onCheckReply,
     this.onToggleTop,
     this.jumpToDialogue,
@@ -65,7 +64,6 @@ class ReplyItemGrpc extends StatelessWidget {
   final VoidCallback? showDialogue;
   final Function? getTag;
   final VoidCallback? onViewImage;
-  final ValueChanged<int>? onDismissed;
   final ValueChanged<ReplyInfo>? onCheckReply;
   final ValueChanged<ReplyInfo>? onToggleTop;
   final VoidCallback? jumpToDialogue;
@@ -274,6 +272,7 @@ class ReplyItemGrpc extends StatelessWidget {
         Padding(
           padding: padding,
           child: custom_text.Text.rich(
+            primary: theme.colorScheme.primary,
             style: TextStyle(
               height: 1.75,
               fontSize: theme.textTheme.bodyMedium!.fontSize,
@@ -316,7 +315,6 @@ class ReplyItemGrpc extends StatelessWidget {
                     )
                     .toList(),
                 onViewImage: onViewImage,
-                onDismissed: onDismissed,
               ),
             ),
           ),
@@ -1030,12 +1028,19 @@ class ReplyItemGrpc extends StatelessWidget {
                 context: context,
                 builder: (context) {
                   return Dialog(
+                    constraints: const BoxConstraints(
+                      minWidth: 280,
+                      maxWidth: 425,
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 20,
                         vertical: 16,
                       ),
-                      child: SelectableText(message),
+                      child: SelectableText(
+                        message,
+                        style: const TextStyle(fontSize: 15, height: 1.7),
+                      ),
                     ),
                   );
                 },

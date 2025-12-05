@@ -67,6 +67,13 @@ List<SettingsModel> get playSettings => [
     setKey: SettingBoxKey.showFsScreenshotBtn,
     defaultVal: true,
   ),
+  SettingsModel(
+    settingsType: SettingsType.sw1tch,
+    title: '全屏显示电池电量',
+    leading: const Icon(Icons.battery_3_bar),
+    setKey: SettingBoxKey.showBatteryLevel,
+    defaultVal: Utils.isMobile,
+  ),
   const SettingsModel(
     settingsType: SettingsType.sw1tch,
     title: '双击快退/快进',
@@ -82,6 +89,14 @@ List<SettingsModel> get playSettings => [
     setKey: SettingBoxKey.enableSlideVolumeBrightness,
     defaultVal: true,
   ),
+  if (Platform.isAndroid)
+    const SettingsModel(
+      settingsType: SettingsType.sw1tch,
+      title: '调节系统亮度',
+      leading: Icon(Icons.brightness_6_outlined),
+      setKey: SettingBoxKey.setSystemBrightness,
+      defaultVal: false,
+    ),
   const SettingsModel(
     settingsType: SettingsType.sw1tch,
     title: '中间滑动进入/退出全屏',
@@ -140,18 +155,19 @@ List<SettingsModel> get playSettings => [
       }
     },
   ),
-  SettingsModel(
-    settingsType: SettingsType.sw1tch,
-    title: '最小化时暂停/还原时播放',
-    leading: const Icon(Icons.pause_circle_outline),
-    setKey: SettingBoxKey.pauseOnMinimize,
-    defaultVal: false,
-    onChanged: (value) {
-      try {
-        Get.find<MainController>().pauseOnMinimize = value;
-      } catch (_) {}
-    },
-  ),
+  if (Utils.isDesktop)
+    SettingsModel(
+      settingsType: SettingsType.sw1tch,
+      title: '最小化时暂停/还原时播放',
+      leading: const Icon(Icons.pause_circle_outline),
+      setKey: SettingBoxKey.pauseOnMinimize,
+      defaultVal: false,
+      onChanged: (value) {
+        try {
+          Get.find<MainController>().pauseOnMinimize = value;
+        } catch (_) {}
+      },
+    ),
   const SettingsModel(
     settingsType: SettingsType.sw1tch,
     title: '启用键盘控制',
@@ -161,7 +177,7 @@ List<SettingsModel> get playSettings => [
   ),
   const SettingsModel(
     settingsType: SettingsType.sw1tch,
-    title: '显示 SuperChat',
+    title: '显示 SuperChat (醒目留言)',
     leading: Icon(Icons.live_tv),
     setKey: SettingBoxKey.showSuperChat,
     defaultVal: true,

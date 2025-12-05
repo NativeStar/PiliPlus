@@ -9,7 +9,10 @@ import 'package:PiliPlus/grpc/bilibili/app/listener/v1.pb.dart'
         PlaylistResp,
         PlaylistSource,
         PlayInfo,
-        ThumbUpReq_ThumbType;
+        ThumbUpReq_ThumbType,
+        ListOrder,
+        DashItem,
+        ResponseUrl;
 import 'package:PiliPlus/http/constants.dart';
 import 'package:PiliPlus/http/ua_type.dart';
 import 'package:PiliPlus/pages/common/common_intro_controller.dart'
@@ -20,6 +23,8 @@ import 'package:PiliPlus/pages/video/controller.dart';
 import 'package:PiliPlus/pages/video/introduction/ugc/widgets/triple_mixin.dart';
 import 'package:PiliPlus/pages/video/pay_coins/view.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
+import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
+import 'package:PiliPlus/services/service_locator.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/global_data.dart';
@@ -76,6 +81,8 @@ class AudioController extends GetxController
   String? _next;
   bool get reachStart => _prev == null;
 
+  ListOrder order = ListOrder.ORDER_NORMAL;
+
   @override
   void onInit() {
     super.onInit();
@@ -114,6 +121,22 @@ class AudioController extends GetxController
         _queryPlayUrl();
       }
     });
+    videoPlayerServiceHandler
+      ?..onPlay = onPlay
+      ..onPause = onPause
+      ..onSeek = onSeek;
+  }
+
+  Future<void> onPlay() async {
+    await player?.play();
+  }
+
+  Future<void> onPause() async {
+    await player?.pause();
+  }
+
+  Future<void> onSeek(Duration duration) async {
+    await player?.seek(duration);
   }
 
   void _updateCurrItem(DetailItem item) {
@@ -121,6 +144,11 @@ class AudioController extends GetxController
     hasLike.value = item.stat.hasLike_7;
     coinNum.value = item.stat.hasCoin_8 ? 2 : 0;
     hasFav.value = item.stat.hasFav;
+    videoPlayerServiceHandler?.onVideoDetailChange(
+      item,
+      (subId.firstOrNull ?? oid).toInt(),
+      hashCode.toString(),
+    );
   }
 
   Future<void> _queryPlayList({
@@ -140,6 +168,7 @@ class AudioController extends GetxController
           ? _next
           : null,
       extraId: extraId,
+      order: order,
     );
     if (res.isSuccess) {
       final PlaylistResp data = res.data;
@@ -199,7 +228,7 @@ class AudioController extends GetxController
           (e) => e.id <= cacheAudioQa,
           (a, b) => a.id > b.id ? a : b,
         );
-        _onOpenMedia(VideoUtils.getCdnUrl(audio));
+        _onOpenMedia(VideoUtils.getCdnUrl(audio.playUrls));
       } else if (playInfo.hasPlayUrl()) {
         final playUrl = playInfo.playUrl;
         final durls = playUrl.durl;
@@ -208,7 +237,7 @@ class AudioController extends GetxController
         }
         final durl = durls.first;
         position.value = Duration.zero;
-        _onOpenMedia(VideoUtils.getDurlCdnUrl(durl));
+        _onOpenMedia(VideoUtils.getCdnUrl(durl.playUrls));
       }
     }
   }
@@ -240,20 +269,30 @@ class AudioController extends GetxController
         if (position.inSeconds != this.position.value.inSeconds) {
           this.position.value = position;
           _videoDetailController?.playedTime = position;
+          videoPlayerServiceHandler?.onPositionChange(position);
         }
       }),
       player!.stream.duration.listen((duration) {
         this.duration.value = duration;
       }),
       player!.stream.playing.listen((playing) {
+        PlayerStatus playerStatus;
         if (playing) {
           animController.forward();
+          playerStatus = PlayerStatus.playing;
         } else {
           animController.reverse();
+          playerStatus = PlayerStatus.paused;
         }
+        videoPlayerServiceHandler?.onStatusChange(playerStatus, false, false);
       }),
       player!.stream.completed.listen((completed) {
         _videoDetailController?.playedTime = duration.value;
+        videoPlayerServiceHandler?.onStatusChange(
+          PlayerStatus.completed,
+          false,
+          false,
+        );
         if (completed) {
           switch (playMode.value) {
             case PlayRepeat.pause:
@@ -262,14 +301,14 @@ class AudioController extends GetxController
               playNext();
               break;
             case PlayRepeat.singleCycle:
-              player?.play();
+              _replay();
               break;
             case PlayRepeat.listCycle:
               if (!playNext()) {
                 if (index != null && index != 0 && playlist != null) {
                   playIndex(0);
                 } else {
-                  player?.play();
+                  _replay();
                 }
               }
               break;
@@ -279,6 +318,10 @@ class AudioController extends GetxController
         }
       }),
     };
+  }
+
+  void _replay() {
+    player?.seek(Duration.zero).whenComplete(player!.play);
   }
 
   @override
@@ -298,6 +341,12 @@ class AudioController extends GetxController
     );
     if (res.isSuccess) {
       hasLike.value = newVal;
+      try {
+        audioItem.value!.stat
+          ..hasLike_7 = newVal
+          ..like += newVal ? 1 : -1;
+        audioItem.refresh();
+      } catch (_) {}
       SmartDialog.showToast(res.data.message);
     } else {
       res.toast();
@@ -321,6 +370,12 @@ class AudioController extends GetxController
       if (data.coinOk && !hasCoin) {
         coinNum.value = 2;
         GlobalData().afterCoin(2);
+        try {
+          audioItem.value!.stat
+            ..hasCoin_8 = true
+            ..coin += 2;
+          audioItem.refresh();
+        } catch (_) {}
       }
       hasFav.value = true;
       if (!hasCoin) {
@@ -352,7 +407,7 @@ class AudioController extends GetxController
 
     if (GlobalData().coins != null && GlobalData().coins! < 1) {
       SmartDialog.showToast('硬币不足');
-      return;
+      // return;
     }
 
     PayCoinsPage.toPayCoinsPage(
@@ -371,10 +426,22 @@ class AudioController extends GetxController
       thumbUp: coinWithLike,
     );
     if (res.isSuccess) {
-      if (coinWithLike) {
+      final updateLike = !hasLike.value && coinWithLike;
+      if (updateLike) {
         hasLike.value = true;
       }
       coinNum.value += coin;
+      try {
+        final stat = audioItem.value!.stat
+          ..hasCoin_8 = true
+          ..coin += coin;
+        if (updateLike) {
+          stat
+            ..hasLike_7 = true
+            ..like += 1;
+        }
+        audioItem.refresh();
+      } catch (_) {}
       GlobalData().afterCoin(coin);
     } else {
       res.toast();
@@ -543,6 +610,9 @@ class AudioController extends GetxController
     if (index != null && playlist != null && player != null) {
       final next = index! + 1;
       if (next < playlist!.length) {
+        if (next == playlist!.length - 1 && _next != null) {
+          _queryPlayList(isLoadNext: true);
+        }
         playIndex(next);
         return true;
       }
@@ -550,16 +620,19 @@ class AudioController extends GetxController
     return false;
   }
 
-  void playIndex(int index) {
-    if (index == this.index) return;
+  void playIndex(int index, {List<Int64>? subId}) {
+    if (index == this.index && subId == null) return;
     this.index = index;
     final audioItem = playlist![index];
     final item = audioItem.item;
     oid = item.oid;
-    subId = item.subId;
+    this.subId =
+        subId ??
+        (item.subId.isNotEmpty ? item.subId : [audioItem.parts.first.subId]);
     itemType = item.itemType;
     _queryPlayUrl().then((res) {
       if (res) {
+        _videoDetailController = null;
         _updateCurrItem(audioItem);
       }
     });
@@ -588,9 +661,12 @@ class AudioController extends GetxController
 
   @override
   void updateFavCount(int count) {
-    audioItem
-      ..value?.stat.favourite += count
-      ..refresh();
+    try {
+      audioItem.value!.stat
+        ..hasFav = count > 0
+        ..favourite += count;
+      audioItem.refresh();
+    } catch (_) {}
   }
 
   Future<void> loadPrev(BuildContext context) async {
@@ -611,14 +687,40 @@ class AudioController extends GetxController
     }
   }
 
+  void onChangeOrder(ListOrder value) {
+    if (order != value) {
+      order = value;
+      _queryPlayList(isInit: true);
+    }
+  }
+
   @override
   void onClose() {
     // _cancelTimer();
+    videoPlayerServiceHandler
+      ?..onPlay = null
+      ..onPause = null
+      ..onSeek = null
+      ..onVideoDetailDispose(hashCode.toString());
     _subscriptions?.forEach((e) => e.cancel());
     _subscriptions = null;
     player?.dispose();
     player = null;
     animController.dispose();
     super.onClose();
+  }
+}
+
+extension on DashItem {
+  Iterable<String> get playUrls sync* {
+    yield baseUrl;
+    yield* backupUrl;
+  }
+}
+
+extension on ResponseUrl {
+  Iterable<String> get playUrls sync* {
+    yield url;
+    yield* backupUrl;
   }
 }

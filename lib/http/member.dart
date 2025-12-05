@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:PiliPlus/common/constants.dart';
@@ -393,6 +392,7 @@ class MemberHttp {
   }
 
   // 用户动态
+  @pragma('vm:notify-debugger-on-exception')
   static Future<LoadingState<DynamicsDataModel>> memberDynamic({
     String? offset,
     int? mid,
@@ -405,15 +405,25 @@ class MemberHttp {
       'timezone_offset': '-480',
       'features': 'itemOpusStyle,listOnlyfans',
       'platform': 'web',
-      'web_location': '333.999',
+      'web_location': '333.1387',
       'dm_img_list': '[]',
       'dm_img_str': dmImgStr,
       'dm_cover_img_str': dmCoverImgStr,
       'dm_img_inter': '{"ds":[],"wh":[0,0,0],"of":[0,0,0]}',
-      'x-bili-device-req-json': jsonEncode({"platform": "web", "device": "pc"}),
-      'x-bili-web-req-json': jsonEncode({"spm_id": "333.999"}),
+      'x-bili-device-req-json':
+          '{"platform":"web","device":"pc","spmid":"333.1387"}',
     });
-    var res = await Request().get(Api.memberDynamic, queryParameters: params);
+    var res = await Request().get(
+      Api.memberDynamic,
+      queryParameters: params,
+      options: Options(
+        headers: {
+          'user-agent': UaType.pc.ua,
+          'origin': 'https://space.bilibili.com',
+          'referer': 'https://space.bilibili.com/$mid/dynamic',
+        },
+      ),
+    );
     if (res.data['code'] == 0) {
       try {
         DynamicsDataModel data = DynamicsDataModel.fromJson(res.data['data']);
@@ -421,8 +431,8 @@ class MemberHttp {
           return memberDynamic(offset: data.offset, mid: mid);
         }
         return Success(data);
-      } catch (err) {
-        return Error(err.toString());
+      } catch (e, s) {
+        return Error('$e\n\n$s');
       }
     } else {
       Map errMap = const {

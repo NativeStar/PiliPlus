@@ -144,13 +144,9 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
       clipBehavior: Clip.none,
       children: [
         GestureDetector(
-          onTap: () {
-            videoDetailCtr.onViewImage();
-            PageUtils.imageView(
-              imgList: [SourceModel(url: item.cover!)],
-              onDismissed: videoDetailCtr.onDismissed,
-            );
-          },
+          onTap: () => PageUtils.imageView(
+            imgList: [SourceModel(url: item.cover!)],
+          ),
           child: Hero(
             tag: item.cover!,
             child: NetworkImgLayer(
@@ -350,9 +346,9 @@ class _PgcIntroPageState extends State<PgcIntroPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(name),
-                  if (role?.isNotEmpty == true)
+                  if (role != null && role.isNotEmpty)
                     Text(
-                      role!,
+                      role,
                       style: TextStyle(
                         fontSize: 12,
                         color: theme.colorScheme.outline,

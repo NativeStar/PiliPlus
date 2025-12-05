@@ -19,6 +19,7 @@ import 'package:PiliPlus/models/common/sponsor_block/segment_type.dart';
 import 'package:PiliPlus/models/common/super_resolution_type.dart';
 import 'package:PiliPlus/models/common/video/video_quality.dart';
 import 'package:PiliPlus/models/video/play/url.dart';
+import 'package:PiliPlus/models_new/video/video_detail/episode.dart' as ugc;
 import 'package:PiliPlus/models_new/video/video_detail/episode.dart';
 import 'package:PiliPlus/models_new/video/video_detail/section.dart';
 import 'package:PiliPlus/models_new/video/video_detail/ugc_season.dart';
@@ -38,6 +39,7 @@ import 'package:PiliPlus/plugin/pl_player/models/bottom_progress_behavior.dart';
 import 'package:PiliPlus/plugin/pl_player/models/double_tap_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
 import 'package:PiliPlus/plugin/pl_player/models/gesture_type.dart';
+import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:PiliPlus/plugin/pl_player/models/video_fit_type.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/app_bar_ani.dart';
 import 'package:PiliPlus/plugin/pl_player/widgets/backward_seek.dart';
@@ -50,6 +52,7 @@ import 'package:PiliPlus/utils/duration_utils.dart';
 import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/path_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/utils.dart';
@@ -63,14 +66,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart' hide ContextExtensionss;
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 class PLVideoPlayer extends StatefulWidget {
@@ -98,7 +99,14 @@ class PLVideoPlayer extends StatefulWidget {
   final Widget headerControl;
   final Widget? bottomControl;
   final Widget? danmuWidget;
-  final void Function([int?, UgcSeason?, dynamic, String?, int?, int?])?
+  final void Function([
+    int?,
+    UgcSeason?,
+    List<ugc.BaseEpisodeItem>?,
+    String?,
+    int?,
+    int?,
+  ])?
   showEpisodes;
   final VoidCallback? showViewPoints;
   final Color fill;
@@ -140,35 +148,30 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   StreamSubscription? _controlsListener;
 
   bool _pauseDueToPauseUponEnteringBackgroundMode = false;
-  StreamSubscription<bool>? wakeLock;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    late final player = plPlayerController.videoController?.player;
-    if (player != null && player.state.playing) {
-      WakelockPlus.enable();
-    }
-    wakeLock = player?.stream.playing.listen(
-      (value) {
-        if (value) {
-          WakelockPlus.enable();
-        } else {
-          WakelockPlus.disable();
-        }
-      },
-    );
-
     _controlsListener = plPlayerController.showControls.listen((bool val) {
       final visible = val && !plPlayerController.controlsLock.value;
-      if (widget.videoDetailController?.headerCtrKey.currentState?.provider
-          case final provider?) {
-        provider
-          ..startIfNeeded()
-          ..muted = !visible;
+
+      if ((widget.headerControl.key as GlobalKey<TimeBatteryMixin>).currentState
+          case final state?) {
+        if (state.mounted) {
+          state.getBatteryLevelIfNeeded();
+          state.provider
+            ?..startIfNeeded()
+            ..muted = !visible;
+          if (visible) {
+            state.startClock();
+          } else {
+            state.stopClock();
+          }
+        }
       }
+
       if (visible) {
         animationController.forward();
       } else {
@@ -210,26 +213,47 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         try {
           _brightnessValue.value =
               await ScreenBrightnessPlatform.instance.application;
-          _listener = ScreenBrightnessPlatform
-              .instance
-              .onApplicationScreenBrightnessChanged
-              .listen((double value) {
-                if (mounted) {
-                  _brightnessValue.value = value;
-                }
-              });
+
+          void listener(double value) {
+            if (mounted) {
+              _brightnessValue.value = value;
+            }
+          }
+
+          _listener = Platform.isIOS || plPlayerController.setSystemBrightness
+              ? ScreenBrightnessPlatform
+                    .instance
+                    .onSystemScreenBrightnessChanged
+                    .listen(listener)
+              : ScreenBrightnessPlatform
+                    .instance
+                    .onApplicationScreenBrightnessChanged
+                    .listen(listener);
         } catch (_) {}
       });
     }
 
-    _tapGestureRecognizer = plPlayerController.enableTapDm
-        ? ImmediateTapGestureRecognizer(
-            onTapDown: _onTapDown,
-            onTapUp: _onTapUp,
-            onTapCancel: _removeDmAction,
-            allowedButtonsFilter: (buttons) => buttons == kPrimaryButton,
-          )
-        : (TapGestureRecognizer()..onTapUp = _onTapUp);
+    if (plPlayerController.enableTapDm) {
+      _tapGestureRecognizer = ImmediateTapGestureRecognizer(
+        onTapDown: plPlayerController.enableShowDanmaku.value
+            ? _onTapDown
+            : null,
+        onTapUp: _onTapUp,
+        onTapCancel: _removeDmAction,
+        allowedButtonsFilter: (buttons) => buttons == kPrimaryButton,
+      );
+
+      _danmakuListener = plPlayerController.enableShowDanmaku.listen((value) {
+        if (!value) _removeDmAction();
+        _tapGestureRecognizer.onTapDown = value ? _onTapDown : null;
+      });
+    } else {
+      _tapGestureRecognizer = ImmediateTapGestureRecognizer(
+        onTapUp: _onTapUp,
+        allowedButtonsFilter: (buttons) => buttons == kPrimaryButton,
+      );
+    }
+
     _doubleTapGestureRecognizer = DoubleTapGestureRecognizer()
       ..onDoubleTapDown = _onDoubleTapDown;
   }
@@ -257,9 +281,15 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   Future<void> setBrightness(double value) async {
     try {
-      await ScreenBrightnessPlatform.instance.setApplicationScreenBrightness(
-        value,
-      );
+      if (Platform.isIOS || plPlayerController.setSystemBrightness) {
+        await ScreenBrightnessPlatform.instance.setSystemScreenBrightness(
+          value,
+        );
+      } else {
+        await ScreenBrightnessPlatform.instance.setApplicationScreenBrightness(
+          value,
+        );
+      }
     } catch (_) {}
     _brightnessIndicator.value = true;
     _brightnessTimer?.cancel();
@@ -274,10 +304,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    wakeLock?.cancel();
-    WakelockPlus.enabled.then((i) {
-      if (i) WakelockPlus.disable();
-    });
+    _danmakuListener?.cancel();
     _tapGestureRecognizer.dispose();
     _longPressRecognizer?.dispose();
     _doubleTapGestureRecognizer.dispose();
@@ -288,7 +315,6 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       FlutterVolumeController.removeListener();
     }
     transformationController.dispose();
-    _refreshDmCallback = null;
     _removeDmAction();
     super.dispose();
   }
@@ -496,6 +522,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           color: Colors.white,
         ),
         onTap: () {
+          if (videoDetailController.isFileSource) {
+            // TODO
+            return;
+          }
           // part -> playAll -> season(pgc)
           if (isPlayAll && !isPart) {
             widget.showEpisodes?.call();
@@ -504,7 +534,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           int? index;
           int currentCid = plPlayerController.cid!;
           String bvid = plPlayerController.bvid;
-          List episodes = [];
+          List<ugc.BaseEpisodeItem> episodes = [];
           if (isSeason) {
             final List<SectionItem> sections = videoDetail.ugcSeason!.sections!;
             for (int i = 0; i < sections.length; i++) {
@@ -574,27 +604,35 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           final list = videoDetailController.languages.value;
           if (list != null && list.isNotEmpty) {
             return PopupMenuButton<String>(
-              tooltip: '原声翻译',
+              tooltip: '翻译',
               requestFocus: false,
               initialValue: videoDetailController.currLang.value,
               color: Colors.black.withValues(alpha: 0.8),
               itemBuilder: (context) {
                 return [
                   PopupMenuItem<String>(
+                    height: 35,
                     value: '',
                     onTap: () => videoDetailController.setLanguage(''),
                     child: const Text(
                       "关闭翻译",
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   ...list.map((e) {
                     return PopupMenuItem<String>(
+                      height: 35,
                       value: e.lang,
                       onTap: () => videoDetailController.setLanguage(e.lang!),
                       child: Text(
                         e.title!,
-                        style: const TextStyle(color: Colors.white),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
                       ),
                     );
                   }),
@@ -632,20 +670,30 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                   return [
                     PopupMenuItem<int>(
                       value: 0,
+                      height: 35,
                       onTap: () => videoDetailController.setSubtitle(0),
                       child: const Text(
                         "关闭字幕",
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                     ...videoDetailController.subtitles.indexed.map((e) {
                       return PopupMenuItem<int>(
                         value: e.$1 + 1,
+                        height: 35,
                         onTap: () =>
                             videoDetailController.setSubtitle(e.$1 + 1),
                         child: Text(
                           "${e.$2.lanDoc}",
-                          style: const TextStyle(color: Colors.white),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
                         ),
                       );
                     }),
@@ -706,8 +754,11 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
       BottomControlType.qa => Obx(
         () {
-          final VideoQuality currentVideoQa =
+          final VideoQuality? currentVideoQa =
               videoDetailController.currentVideoQa.value;
+          if (currentVideoQa == null) {
+            return const SizedBox.shrink();
+          }
           final PlayUrlModel videoInfo = videoDetailController.data;
           if (videoInfo.dash == null) {
             return const SizedBox.shrink();
@@ -805,13 +856,19 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
               ),
         onTap: () =>
             plPlayerController.triggerFullScreen(status: !isFullScreen),
+        onSecondaryTap: () => plPlayerController.triggerFullScreen(
+          status: !isFullScreen,
+          inAppFullScreen: true,
+        ),
       ),
     };
+
+    final isNotFileSource = !plPlayerController.isFileSource;
 
     List<BottomControlType> userSpecifyItemLeft = [
       BottomControlType.playOrPause,
       BottomControlType.time,
-      if (anySeason) ...[
+      if (!isNotFileSource || anySeason) ...[
         BottomControlType.pre,
         BottomControlType.next,
       ],
@@ -820,16 +877,18 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     final flag =
         isFullScreen || plPlayerController.isDesktopPip || maxWidth >= 500;
     List<BottomControlType> userSpecifyItemRight = [
-      if (plPlayerController.showDmChart) BottomControlType.dmChart,
+      if (isNotFileSource && plPlayerController.showDmChart)
+        BottomControlType.dmChart,
       if (plPlayerController.isAnim) BottomControlType.superResolution,
-      if (plPlayerController.showViewPoints) BottomControlType.viewPoints,
-      if (anySeason) BottomControlType.episode,
+      if (isNotFileSource && plPlayerController.showViewPoints)
+        BottomControlType.viewPoints,
+      if (isNotFileSource && anySeason) BottomControlType.episode,
       if (flag) BottomControlType.fit,
-      BottomControlType.aiTranslate,
+      if (isNotFileSource) BottomControlType.aiTranslate,
       BottomControlType.subtitle,
       BottomControlType.speed,
-      if (flag) BottomControlType.qa,
-      BottomControlType.fullscreen,
+      if (isNotFileSource && flag) BottomControlType.qa,
+      if (!plPlayerController.isDesktopPip) BottomControlType.fullscreen,
     ];
 
     return Row(
@@ -887,7 +946,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   void _onInteractionUpdate(ScaleUpdateDetails details) {
-    showRestoreScaleBtn.value = transformationController.value.row0.x != 1.0;
+    showRestoreScaleBtn.value =
+        transformationController.value.storage[0] != 1.0;
     if (interacting || plPlayerController.initialFocalPoint == Offset.zero) {
       return;
     }
@@ -1006,7 +1066,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       plPlayerController
         ..onUpdatedSliderProgress(result)
         ..onChangedSliderStart();
-      if (plPlayerController.showSeekPreview &&
+      if (!plPlayerController.isFileSource &&
+          plPlayerController.showSeekPreview &&
           plPlayerController.cancelSeek != true) {
         plPlayerController.updatePreviewIndex(newPos ~/ 1000);
       }
@@ -1126,33 +1187,30 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       default:
         if (_suspendedDm == null) {
           plPlayerController.controls = !plPlayerController.showControls.value;
+        } else if (_suspendedDm!.suspend) {
+          _dmOffset.value = details.localPosition;
         } else {
-          _dmOffset = details.localPosition;
-          _refreshDmCallback?.call();
+          _suspendedDm = null;
         }
         break;
     }
   }
 
   void _onTapDown(TapDownDetails details) {
-    if (Utils.isMobile) {
-      final ctr = plPlayerController.danmakuController;
-      if (ctr != null) {
-        final pos = details.localPosition;
-        final item = ctr.findSingleDanmaku(pos);
-        if (item == null) {
-          if (_suspendedDm != null) {
-            _removeDmAction();
-          }
-        } else if (item != _suspendedDm) {
-          if (item.content.extra == null) {
-            _removeDmAction();
-            return;
-          }
-          _suspendedDm?.suspend = false;
-          _suspendedDm = item..suspend = true;
-          _dmOffset = pos;
+    final ctr = plPlayerController.danmakuController;
+    if (ctr != null) {
+      final pos = details.localPosition;
+      final item = ctr.findSingleDanmaku(pos);
+      if (item == null) {
+        _suspendedDm?.suspend = false;
+        _dmOffset.value = null;
+      } else if (item != _suspendedDm) {
+        _suspendedDm?.suspend = false;
+        if (item.content.extra == null) {
+          _dmOffset.value = null;
+          return;
         }
+        _suspendedDm = item..suspend = true;
       }
     }
   }
@@ -1170,18 +1228,31 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   LongPressGestureRecognizer? _longPressRecognizer;
   LongPressGestureRecognizer get longPressRecognizer => _longPressRecognizer ??=
-      LongPressGestureRecognizer(duration: const Duration(milliseconds: 300))
+      LongPressGestureRecognizer(
+          duration: plPlayerController.enableTapDm
+              ? const Duration(milliseconds: 300)
+              : null,
+        )
         ..onLongPressStart = ((_) =>
             plPlayerController.setLongPressStatus(true))
-        ..onLongPressEnd = (_) => plPlayerController.setLongPressStatus(false);
-  late final OneSequenceGestureRecognizer _tapGestureRecognizer;
+        ..onLongPressEnd = ((_) => plPlayerController.setLongPressStatus(false))
+        ..onLongPressCancel = (() =>
+            plPlayerController.setLongPressStatus(false));
+  late final ImmediateTapGestureRecognizer _tapGestureRecognizer;
   late final DoubleTapGestureRecognizer _doubleTapGestureRecognizer;
+  StreamSubscription<bool>? _danmakuListener;
 
   void _onPointerDown(PointerDownEvent event) {
     if (Utils.isDesktop) {
       final buttons = event.buttons;
       final isSecondaryBtn = buttons == kSecondaryMouseButton;
       if (isSecondaryBtn || buttons == kMiddleMouseButton) {
+        final isFullScreen = this.isFullScreen;
+        if (isFullScreen && plPlayerController.controlsLock.value) {
+          plPlayerController
+            ..controlsLock.value = false
+            ..showControls.value = false;
+        }
         plPlayerController
             .triggerFullScreen(
               status: !isFullScreen,
@@ -1253,7 +1324,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       plPlayerController
         ..onUpdatedSliderProgress(result)
         ..onChangedSliderStart();
-      if (plPlayerController.showSeekPreview &&
+      if (!plPlayerController.isFileSource &&
+          plPlayerController.showSeekPreview &&
           plPlayerController.cancelSeek != true) {
         plPlayerController.updatePreviewIndex(newPos ~/ 1000);
       }
@@ -1317,7 +1389,6 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
         if (!isLive)
           Positioned.fill(
-            top: 4,
             child: IgnorePointer(
               ignoring: !plPlayerController.enableDragSubtitle,
               child: Obx(
@@ -1332,15 +1403,14 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           ),
 
         if (plPlayerController.enableTapDm)
-          Builder(
-            builder: (context) {
-              _refreshDmCallback = () {
-                if (context.mounted) {
-                  ((context) as Element).markNeedsBuild();
-                }
-              };
-              if (_dmOffset != null && _suspendedDm != null) {
-                return _buildDmAction(_suspendedDm!, _dmOffset!);
+          Obx(
+            () {
+              if (!plPlayerController.enableShowDanmaku.value) {
+                return const SizedBox.shrink();
+              }
+              final dmOffset = _dmOffset.value;
+              if (dmOffset != null && _suspendedDm != null) {
+                return _buildDmAction(_suspendedDm!, dmOffset);
               }
               return const SizedBox.shrink();
             },
@@ -1717,7 +1787,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                         0,
                       ),
                     ),
-                    if (plPlayerController.enableSponsorBlock &&
+                    if (plPlayerController.enableBlock &&
                         videoDetailController.segmentProgressList.isNotEmpty)
                       Positioned(
                         left: 0,
@@ -1782,86 +1852,86 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             maxHeight,
           ),
 
-        // 锁
-        if (!isLive &&
-            plPlayerController.showFsLockBtn &&
-            (isFullScreen || plPlayerController.isDesktopPip))
-          ViewSafeArea(
-            right: false,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FractionalTranslation(
-                translation: const Offset(1, -0.4),
-                child: Obx(
-                  () => Offstage(
-                    offstage: !plPlayerController.showControls.value,
-                    child: DecoratedBox(
-                      decoration: const BoxDecoration(
-                        color: Color(0x45000000),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                      child: Obx(() {
-                        final controlsLock =
-                            plPlayerController.controlsLock.value;
-                        return ComBtn(
-                          tooltip: controlsLock ? '解锁' : '锁定',
-                          icon: controlsLock
-                              ? const Icon(
-                                  FontAwesomeIcons.lock,
-                                  size: 15,
-                                  color: Colors.white,
-                                )
-                              : const Icon(
-                                  FontAwesomeIcons.lockOpen,
-                                  size: 15,
-                                  color: Colors.white,
-                                ),
-                          onTap: () =>
-                              plPlayerController.onLockControl(!controlsLock),
-                        );
-                      }),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-        // 截图
-        if (isFullScreen && plPlayerController.showFsScreenshotBtn)
-          ViewSafeArea(
-            left: false,
-            child: Obx(
-              () => Align(
-                alignment: Alignment.centerRight,
+        if (isFullScreen || plPlayerController.isDesktopPip) ...[
+          // 锁
+          if (plPlayerController.showFsLockBtn)
+            ViewSafeArea(
+              right: false,
+              child: Align(
+                alignment: Alignment.centerLeft,
                 child: FractionalTranslation(
-                  translation: const Offset(-1, -0.4),
-                  child: Offstage(
-                    offstage: !plPlayerController.showControls.value,
-                    child: DecoratedBox(
-                      decoration: const BoxDecoration(
-                        color: Color(0x45000000),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                      child: ComBtn(
-                        tooltip: '截图',
-                        icon: const Icon(
-                          Icons.photo_camera,
-                          size: 20,
-                          color: Colors.white,
+                  translation: const Offset(1, -0.4),
+                  child: Obx(
+                    () => Offstage(
+                      offstage: !plPlayerController.showControls.value,
+                      child: DecoratedBox(
+                        decoration: const BoxDecoration(
+                          color: Color(0x45000000),
+                          borderRadius: BorderRadius.all(Radius.circular(8)),
                         ),
-                        onLongPress:
-                            (Platform.isAndroid || kDebugMode) && !isLive
-                            ? screenshotWebp
-                            : null,
-                        onTap: plPlayerController.takeScreenshot,
+                        child: Obx(() {
+                          final controlsLock =
+                              plPlayerController.controlsLock.value;
+                          return ComBtn(
+                            tooltip: controlsLock ? '解锁' : '锁定',
+                            icon: controlsLock
+                                ? const Icon(
+                                    FontAwesomeIcons.lock,
+                                    size: 15,
+                                    color: Colors.white,
+                                  )
+                                : const Icon(
+                                    FontAwesomeIcons.lockOpen,
+                                    size: 15,
+                                    color: Colors.white,
+                                  ),
+                            onTap: () =>
+                                plPlayerController.onLockControl(!controlsLock),
+                          );
+                        }),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
+
+          // 截图
+          if (plPlayerController.showFsScreenshotBtn)
+            ViewSafeArea(
+              left: false,
+              child: Obx(
+                () => Align(
+                  alignment: Alignment.centerRight,
+                  child: FractionalTranslation(
+                    translation: const Offset(-1, -0.4),
+                    child: Offstage(
+                      offstage: !plPlayerController.showControls.value,
+                      child: DecoratedBox(
+                        decoration: const BoxDecoration(
+                          color: Color(0x45000000),
+                          borderRadius: BorderRadius.all(Radius.circular(8)),
+                        ),
+                        child: ComBtn(
+                          tooltip: '截图',
+                          icon: const Icon(
+                            Icons.photo_camera,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                          onLongPress:
+                              (Platform.isAndroid || kDebugMode) && !isLive
+                              ? screenshotWebp
+                              : null,
+                          onTap: plPlayerController.takeScreenshot,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
 
         Obx(() {
           if (plPlayerController.dataStatus.loading ||
@@ -2019,6 +2089,13 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
               : EdgeInsets.zero,
           panAxis: PanAxis.aligned,
           transformationController: transformationController,
+          onTranslate: () {
+            final storage = transformationController.value.storage;
+            showRestoreScaleBtn.value =
+                storage[12].abs() > 2.0 ||
+                storage[13].abs() > 2.0 ||
+                storage[0] != 1.0;
+          },
           childKey: _videoKey,
           child: RepaintBoundary(
             key: _videoKey,
@@ -2156,7 +2233,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     final progress = 0.0.obs;
     final name =
         '${ctr.cid}-${segment.first.toStringAsFixed(3)}_${segment.second.toStringAsFixed(3)}.webp';
-    final file = '${await Utils.temporaryDirectory}/$name';
+    final file = '$tmpDirPath/$name';
 
     final mpv = MpvConvertWebp(
       url!,
@@ -2191,31 +2268,34 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     );
   }
 
-  static const _overlaySpacing = 10.0;
-  static const _overlayWidth = 118.0;
-  static const _overlayHeight = 35.0;
+  static const _overlaySpacing = 5.0;
+  static const _actionItemWidth = 40.0;
+  static const _actionItemHeight = 35.0 - _triangleHeight;
 
   DanmakuItem<DanmakuExtra>? _suspendedDm;
-  Offset? _dmOffset;
-  void Function()? _refreshDmCallback;
+  late final Rxn<Offset> _dmOffset = Rxn<Offset>();
 
   void _removeDmAction() {
-    _suspendedDm?.suspend = false;
-    _suspendedDm = null;
-    _dmOffset = null;
-    _refreshDmCallback?.call();
+    if (_suspendedDm != null) {
+      _suspendedDm?.suspend = false;
+      _suspendedDm = null;
+      _dmOffset.value = null;
+    }
   }
 
-  Widget _dmActionItem(Widget child, {required VoidCallback onTap}) {
+  Widget _dmActionItem(
+    Widget child, {
+    required FutureOr<void> Function() onTap,
+  }) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () {
+      onTap: () async {
+        await onTap();
         _removeDmAction();
-        onTap();
       },
       child: SizedBox(
-        height: _overlayHeight,
-        width: _overlayWidth / 3,
+        width: _actionItemWidth,
+        height: _actionItemHeight,
         child: Center(
           child: child,
         ),
@@ -2223,15 +2303,17 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     );
   }
 
-  String _getDmTipBg(DanmakuItem item) {
-    const offset = 65;
-    if (item.xPosition >= maxWidth - offset) {
-      return 'right';
+  static final _timeRegExp = RegExp(r'(?:\d+[:：])?\d+[:：][0-5]?\d(?!\d)');
+
+  int? _getValidOffset(String data) {
+    if (_timeRegExp.firstMatch(data) case final timeStr?) {
+      final offset = DurationUtils.parseDuration(timeStr.group(0));
+      if (0 < offset &&
+          offset * 1000 < videoDetailController.data.timeLength!) {
+        return offset;
+      }
     }
-    if (item.xPosition + item.width <= offset) {
-      return 'left';
-    }
-    return 'center';
+    return null;
   }
 
   Widget _buildDmAction(
@@ -2245,17 +2327,24 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       return const Positioned(left: 0, top: 0, child: SizedBox.shrink());
     }
 
+    final seekOffset = _getValidOffset(item.content.text);
+
+    final overlayWidth = _actionItemWidth * (seekOffset == null ? 3 : 4);
+
     final dy = item.content.type == DanmakuItemType.bottom
         ? maxHeight - item.yPosition - item.height
         : item.yPosition;
-    final top = dy + item.height + 4;
-    final right =
-        maxWidth -
-        clampDouble(
-          dx + _overlayWidth / 2,
-          _overlaySpacing + _overlayWidth,
-          maxWidth - _overlaySpacing,
-        );
+    final top = dy + item.height + _triangleHeight + 2;
+
+    final realLeft = dx + overlayWidth / 2;
+
+    final left = realLeft.clamp(
+      _overlaySpacing + overlayWidth,
+      maxWidth - _overlaySpacing,
+    );
+
+    final right = maxWidth - left;
+    final triangleOffset = realLeft - left;
 
     if (right > (maxWidth - item.xPosition)) {
       _removeDmAction();
@@ -2267,116 +2356,132 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     return Positioned(
       right: right,
       top: top,
-      child: SizedBox(
-        width: _overlayWidth,
-        height: _overlayHeight,
-        child: Stack(
-          children: [
-            SvgPicture.asset(
-              'assets/images/dm_tip/player_dm_tip_${_getDmTipBg(item)}.svg',
-              clipBehavior: Clip.none,
-              width: _overlayWidth,
-              height: _overlayHeight,
-            ),
-            Positioned.fill(
-              top: 4,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: extra is VideoDanmaku
-                    ? [
-                        _dmActionItem(
-                          extra.isLike
-                              ? const Icon(
-                                  size: 20,
-                                  CustomIcons.player_dm_tip_like_solid,
-                                  color: Colors.white,
-                                )
-                              : const Icon(
-                                  size: 20,
-                                  CustomIcons.player_dm_tip_like,
-                                  color: Colors.white,
-                                ),
-                          onTap: () => HeaderControl.likeDanmaku(
-                            extra,
-                            plPlayerController.cid!,
-                          ),
-                        ),
-                        _dmActionItem(
-                          const Icon(
-                            size: 19,
-                            CustomIcons.player_dm_tip_copy,
-                            color: Colors.white,
-                          ),
-                          onTap: () => Utils.copyText(item.content.text),
-                        ),
-                        if (item.content.selfSend)
-                          _dmActionItem(
-                            const Icon(
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: _DanmakuTipPainter(offset: triangleOffset),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: switch (extra) {
+              null => throw UnimplementedError(),
+              VideoDanmaku() => [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    _dmActionItem(
+                      extra.isLike
+                          ? const Icon(
                               size: 20,
-                              CustomIcons.player_dm_tip_recall,
+                              CustomIcons.player_dm_tip_like_solid,
+                              color: Colors.white,
+                            )
+                          : const Icon(
+                              size: 20,
+                              CustomIcons.player_dm_tip_like,
                               color: Colors.white,
                             ),
-                            onTap: () => HeaderControl.deleteDanmaku(
-                              extra.id,
-                              plPlayerController.cid!,
-                            ),
-                          )
-                        else
-                          _dmActionItem(
-                            const Icon(
-                              size: 20,
-                              CustomIcons.player_dm_tip_back,
-                              color: Colors.white,
-                            ),
-                            onTap: () => HeaderControl.reportDanmaku(
-                              context,
-                              extra: extra,
-                              ctr: plPlayerController,
-                            ),
-                          ),
-                      ]
-                    : extra is LiveDanmaku
-                    ? [
-                        _dmActionItem(
-                          const Icon(
-                            size: 20,
-                            MdiIcons.accountOutline,
+                      onTap: () => HeaderControl.likeDanmaku(
+                        extra,
+                        plPlayerController.cid!,
+                      ),
+                    ),
+                    if (extra.like > 0)
+                      Positioned(
+                        left: _actionItemWidth - 10.5,
+                        top: 0,
+                        child: Text(
+                          extra.like.toString(),
+                          style: const TextStyle(
+                            fontSize: 10.5,
                             color: Colors.white,
                           ),
-                          onTap: () => Get.toNamed('/member?mid=${extra.mid}'),
                         ),
-                        _dmActionItem(
-                          const Icon(
-                            size: 19,
-                            CustomIcons.player_dm_tip_copy,
-                            color: Colors.white,
-                          ),
-                          onTap: () => Utils.copyText(item.content.text),
-                        ),
-                        _dmActionItem(
-                          const Icon(
-                            size: 20,
-                            CustomIcons.player_dm_tip_back,
-                            color: Colors.white,
-                          ),
-                          onTap: () => HeaderControl.reportLiveDanmaku(
-                            context,
-                            roomId:
-                                (widget.bottomControl
-                                        as live_bottom.BottomControl)
-                                    .liveRoomCtr
-                                    .roomId,
-                            msg: item.content.text,
-                            extra: extra,
-                            ctr: plPlayerController,
-                          ),
-                        ),
-                      ]
-                    : throw UnimplementedError(),
-              ),
-            ),
-          ],
+                      ),
+                  ],
+                ),
+
+                _dmActionItem(
+                  const Icon(
+                    size: 19,
+                    CustomIcons.player_dm_tip_copy,
+                    color: Colors.white,
+                  ),
+                  onTap: () => Utils.copyText(item.content.text),
+                ),
+                if (item.content.selfSend)
+                  _dmActionItem(
+                    const Icon(
+                      size: 20,
+                      CustomIcons.player_dm_tip_recall,
+                      color: Colors.white,
+                    ),
+                    onTap: () => HeaderControl.deleteDanmaku(
+                      extra.id,
+                      plPlayerController.cid!,
+                    ),
+                  )
+                else
+                  _dmActionItem(
+                    const Icon(
+                      size: 20,
+                      CustomIcons.player_dm_tip_back,
+                      color: Colors.white,
+                    ),
+                    onTap: () => HeaderControl.reportDanmaku(
+                      context,
+                      extra: extra,
+                      ctr: plPlayerController,
+                    ),
+                  ),
+                if (seekOffset != null)
+                  _dmActionItem(
+                    const Icon(
+                      size: 18,
+                      Icons.gps_fixed_outlined,
+                      color: Colors.white,
+                    ),
+                    onTap: () => plPlayerController.seekTo(
+                      Duration(seconds: seekOffset),
+                      isSeek: false,
+                    ),
+                  ),
+              ],
+              LiveDanmaku() => [
+                _dmActionItem(
+                  const Icon(
+                    size: 20,
+                    MdiIcons.accountOutline,
+                    color: Colors.white,
+                  ),
+                  onTap: () => Get.toNamed('/member?mid=${extra.mid}'),
+                ),
+                _dmActionItem(
+                  const Icon(
+                    size: 19,
+                    CustomIcons.player_dm_tip_copy,
+                    color: Colors.white,
+                  ),
+                  onTap: () => Utils.copyText(item.content.text),
+                ),
+                _dmActionItem(
+                  const Icon(
+                    size: 20,
+                    CustomIcons.player_dm_tip_back,
+                    color: Colors.white,
+                  ),
+                  onTap: () => HeaderControl.reportLiveDanmaku(
+                    context,
+                    roomId: (widget.bottomControl as live_bottom.BottomControl)
+                        .liveRoomCtr
+                        .roomId,
+                    msg: item.content.text,
+                    extra: extra,
+                    ctr: plPlayerController,
+                  ),
+                ),
+              ],
+            },
+          ),
         ),
       ),
     );
@@ -2724,4 +2829,61 @@ Widget buildViewPointWidget(
       },
     ),
   );
+}
+
+const double _triangleHeight = 5.6;
+
+class _DanmakuTipPainter extends CustomPainter {
+  final double offset;
+
+  const _DanmakuTipPainter({this.offset = 0});
+
+  @override
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xB3000000)
+      ..style = PaintingStyle.fill;
+
+    final strokePaint = Paint()
+      ..color = const Color(0x7EFFFFFF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.25;
+
+    final radius = size.height / 2;
+    const triangleBase = _triangleHeight * 2 / 3;
+
+    final triangleCenterX = (size.width / 2 + offset).clamp(
+      radius + triangleBase,
+      size.width - radius - triangleBase,
+    );
+    final path = Path()
+      // triangle (exceed)
+      ..moveTo(triangleCenterX - triangleBase, 0)
+      ..lineTo(triangleCenterX, -_triangleHeight)
+      ..lineTo(triangleCenterX + triangleBase, 0)
+      // top
+      ..lineTo(size.width - radius, 0)
+      // right
+      ..arcToPoint(
+        Offset(size.width - radius, size.height),
+        radius: Radius.circular(radius),
+      )
+      // bottom
+      ..lineTo(radius, size.height)
+      // left
+      ..arcToPoint(
+        Offset(radius, 0),
+        radius: Radius.circular(radius),
+      )
+      ..close();
+
+    canvas
+      ..drawPath(path, paint)
+      ..drawPath(path, strokePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DanmakuTipPainter oldDelegate) =>
+      oldDelegate.offset != offset;
 }

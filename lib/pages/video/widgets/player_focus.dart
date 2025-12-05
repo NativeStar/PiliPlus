@@ -87,6 +87,9 @@ class PlayerFocus extends StatelessWidget {
 
     final isKeyQ = key == LogicalKeyboardKey.keyQ;
     if (isKeyQ || key == LogicalKeyboardKey.keyR) {
+      if (HardwareKeyboard.instance.isMetaPressed) {
+        return true;
+      }
       if (!plPlayerController.isLive) {
         if (event is KeyDownEvent) {
           introController!.onStartTriple();
@@ -155,35 +158,37 @@ class PlayerFocus extends StatelessWidget {
           return true;
 
         case LogicalKeyboardKey.keyF:
-          plPlayerController
-            ..triggerFullScreen(
-              status: !isFullScreen,
-              inAppFullScreen: HardwareKeyboard.instance.isShiftPressed,
-            )
-            ..controlsLock.value = false;
+          final isFullScreen = this.isFullScreen;
+          if (isFullScreen && plPlayerController.controlsLock.value) {
+            plPlayerController
+              ..controlsLock.value = false
+              ..showControls.value = false;
+          }
+          plPlayerController.triggerFullScreen(
+            status: !isFullScreen,
+            inAppFullScreen: HardwareKeyboard.instance.isShiftPressed,
+          );
           return true;
 
         case LogicalKeyboardKey.keyD:
-          if (plPlayerController.isLive) {
-            final newVal = !plPlayerController.enableShowLiveDanmaku.value;
-            plPlayerController.enableShowLiveDanmaku.value = newVal;
-            if (!plPlayerController.tempPlayerConf) {
-              GStorage.setting.put(SettingBoxKey.enableShowLiveDanmaku, newVal);
-            }
-          } else {
-            final newVal = !plPlayerController.enableShowDanmaku.value;
-            plPlayerController.enableShowDanmaku.value = newVal;
-            if (!plPlayerController.tempPlayerConf) {
-              GStorage.setting.put(SettingBoxKey.enableShowDanmaku, newVal);
-            }
+          final newVal = !plPlayerController.enableShowDanmaku.value;
+          plPlayerController.enableShowDanmaku.value = newVal;
+          if (!plPlayerController.tempPlayerConf) {
+            GStorage.setting.put(
+              plPlayerController.isLive
+                  ? SettingBoxKey.enableShowLiveDanmaku
+                  : SettingBoxKey.enableShowDanmaku,
+              newVal,
+            );
           }
           return true;
 
         case LogicalKeyboardKey.keyP:
-          if (Utils.isDesktop && hasPlayer) {
+          if (Utils.isDesktop && hasPlayer && !isFullScreen) {
             plPlayerController
               ..toggleDesktopPip()
-              ..controlsLock.value = false;
+              ..controlsLock.value = false
+              ..showControls.value = false;
           }
           return true;
 
@@ -201,6 +206,14 @@ class PlayerFocus extends StatelessWidget {
         case LogicalKeyboardKey.keyS:
           if (hasPlayer && isFullScreen) {
             plPlayerController.takeScreenshot();
+          }
+          return true;
+
+        case LogicalKeyboardKey.keyL:
+          if (isFullScreen || plPlayerController.isDesktopPip) {
+            plPlayerController.onLockControl(
+              !plPlayerController.controlsLock.value,
+            );
           }
           return true;
 
@@ -223,6 +236,9 @@ class PlayerFocus extends StatelessWidget {
             return true;
 
           case LogicalKeyboardKey.keyW:
+            if (HardwareKeyboard.instance.isMetaPressed) {
+              return true;
+            }
             introController?.actionCoinVideo();
             return true;
 
@@ -237,14 +253,6 @@ class PlayerFocus extends StatelessWidget {
           case LogicalKeyboardKey.keyG:
             if (introController case UgcIntroController ugcCtr) {
               ugcCtr.actionRelationMod(Get.context!);
-            }
-            return true;
-
-          case LogicalKeyboardKey.keyL:
-            if (isFullScreen || plPlayerController.isDesktopPip) {
-              plPlayerController.onLockControl(
-                !plPlayerController.controlsLock.value,
-              );
             }
             return true;
 

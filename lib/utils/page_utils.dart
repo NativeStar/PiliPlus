@@ -41,17 +41,16 @@ abstract class PageUtils {
   static Future<void> imageView({
     int initialPage = 0,
     required List<SourceModel> imgList,
-    ValueChanged<int>? onDismissed,
     int? quality,
   }) {
     return Get.key.currentState!.push<void>(
       HeroDialogRoute(
-        builder: (context) => InteractiveviewerGallery(
-          sources: imgList,
-          initIndex: initialPage,
-          onDismissed: onDismissed,
-          quality: quality ?? GlobalData().imgQuality,
-        ),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            InteractiveviewerGallery(
+              sources: imgList,
+              initIndex: initialPage,
+              quality: quality ?? GlobalData().imgQuality,
+            ),
       ),
     );
   }
@@ -320,7 +319,6 @@ abstract class PageUtils {
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
-      sheetAnimationStyle: const AnimationStyle(curve: Curves.ease),
       constraints: BoxConstraints(
         maxWidth: min(640, context.mediaQueryShortestSide),
       ),
@@ -350,20 +348,21 @@ abstract class PageUtils {
     );
   }
 
-  static void enterPip({int? width, int? height}) {
+  static void enterPip({int? width, int? height, bool isAuto = false}) {
     if (width != null && height != null) {
       Rational aspectRatio = Rational(width, height);
+      aspectRatio = aspectRatio.fitsInAndroidRequirements
+          ? aspectRatio
+          : height > width
+          ? const Rational.vertical()
+          : const Rational.landscape();
       Floating().enable(
-        EnableManual(
-          aspectRatio: aspectRatio.fitsInAndroidRequirements
-              ? aspectRatio
-              : height > width
-              ? const Rational.vertical()
-              : const Rational.landscape(),
-        ),
+        isAuto
+            ? AutoEnable(aspectRatio: aspectRatio)
+            : EnableManual(aspectRatio: aspectRatio),
       );
     } else {
-      Floating().enable(const EnableManual());
+      Floating().enable(isAuto ? const AutoEnable() : const EnableManual());
     }
   }
 
@@ -554,42 +553,28 @@ abstract class PageUtils {
 
   static void onHorizontalPreviewState(
     ScaffoldState state,
-    TickerProvider vsync,
     List<SourceModel> imgList,
     int index,
   ) {
-    final ctr = AnimationController(
-      vsync: vsync,
-      duration: const Duration(milliseconds: 200),
+    final animController = AnimationController(
+      vsync: state,
+      duration: Duration.zero,
+      reverseDuration: Duration.zero,
     )..forward();
     state.showBottomSheet(
       constraints: const BoxConstraints(),
       (context) {
-        return FadeTransition(
-          opacity: Tween<double>(begin: 0, end: 1).animate(ctr),
-          child: InteractiveviewerGallery(
-            sources: imgList,
-            initIndex: index,
-            onClose: (value) async {
-              if (!value) {
-                try {
-                  await ctr.reverse();
-                } catch (_) {}
-              }
-              try {
-                ctr.dispose();
-              } catch (_) {}
-              if (!value) {
-                Get.back();
-              }
-            },
-            quality: GlobalData().imgQuality,
-          ),
+        return InteractiveviewerGallery(
+          sources: imgList,
+          initIndex: index,
+          quality: GlobalData().imgQuality,
+          onClose: animController.dispose,
         );
       },
       enableDrag: false,
       elevation: 0.0,
       backgroundColor: Colors.transparent,
+      transitionAnimationController: animController,
       sheetAnimationStyle: const AnimationStyle(duration: Duration.zero),
     );
   }
@@ -659,7 +644,7 @@ abstract class PageUtils {
   static void showVideoBottomSheet(
     BuildContext context, {
     required Widget child,
-    required Function isFullScreen,
+    required bool Function() isFullScreen,
     double? padding,
   }) {
     if (!context.mounted) {
@@ -669,25 +654,29 @@ abstract class PageUtils {
       barrierLabel: '',
       barrierDismissible: true,
       pageBuilder: (buildContext, animation, secondaryAnimation) {
-        return Get.context!.isPortrait
-            ? SafeArea(
-                child: Column(
-                  children: [
-                    const Spacer(flex: 3),
-                    Expanded(flex: 7, child: child),
-                    if (isFullScreen() && padding != null)
-                      SizedBox(height: padding),
-                  ],
-                ),
-              )
-            : SafeArea(
-                child: Row(
-                  children: [
-                    const Spacer(),
-                    Expanded(child: child),
-                  ],
-                ),
-              );
+        if (Get.context!.isPortrait) {
+          return SafeArea(
+            child: FractionallySizedBox(
+              heightFactor: 0.7,
+              widthFactor: 1.0,
+              alignment: Alignment.bottomCenter,
+              child: isFullScreen() && padding != null
+                  ? Padding(
+                      padding: EdgeInsets.only(bottom: padding),
+                      child: child,
+                    )
+                  : child,
+            ),
+          );
+        }
+        return SafeArea(
+          child: FractionallySizedBox(
+            widthFactor: 0.5,
+            heightFactor: 1.0,
+            alignment: Alignment.centerRight,
+            child: child,
+          ),
+        );
       },
       transitionDuration: const Duration(milliseconds: 350),
       transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -721,7 +710,7 @@ abstract class PageUtils {
     }
   }
 
-  static void toVideoPage({
+  static Future<void>? toVideoPage({
     VideoType videoType = VideoType.ugc,
     int? aid,
     String? bvid,
@@ -733,7 +722,6 @@ abstract class PageUtils {
     String? title,
     int? progress,
     Map? extraArguments,
-    int? id,
     bool off = false,
   }) {
     final arguments = {
@@ -751,17 +739,15 @@ abstract class PageUtils {
       ...?extraArguments,
     };
     if (off) {
-      Get.offNamed(
+      return Get.offNamed(
         '/videoV',
         arguments: arguments,
-        id: id,
         preventDuplicates: false,
       );
     } else {
-      Get.toNamed(
+      return Get.toNamed(
         '/videoV',
         arguments: arguments,
-        id: id,
         preventDuplicates: false,
       );
     }

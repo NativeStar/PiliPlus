@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.dart';
 import 'package:PiliPlus/common/widgets/progress_bar/segment_progress_bar.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
@@ -9,7 +7,6 @@ import 'package:PiliPlus/utils/extension.dart';
 import 'package:PiliPlus/utils/feed_back.dart';
 import 'package:PiliPlus/utils/utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:get/get.dart';
 
 class BottomControl extends StatelessWidget {
@@ -36,37 +33,16 @@ class BottomControl extends StatelessWidget {
         : colorScheme.primary;
     final thumbGlowColor = primary.withAlpha(80);
     final bufferedBarColor = primary.withValues(alpha: 0.4);
-    //阅读器限制
-    Timer? accessibilityDebounce;
-    double lastAnnouncedValue = -1;
     void onDragStart(ThumbDragDetails duration) {
       feedBack();
       controller.onChangedSliderStart(duration.timeStamp);
     }
 
     void onDragUpdate(ThumbDragDetails duration, int max) {
-      if (controller.showSeekPreview) {
-        controller.updatePreviewIndex(
-          duration.timeStamp.inSeconds,
-        );
+      if (!controller.isFileSource && controller.showSeekPreview) {
+        controller.updatePreviewIndex(duration.timeStamp.inSeconds);
       }
-      double newProgress = duration.timeStamp.inSeconds / max;
-      if ((newProgress - lastAnnouncedValue).abs() > 0.02) {
-        accessibilityDebounce?.cancel();
-        accessibilityDebounce = Timer(
-          const Duration(milliseconds: 200),
-          () {
-            SemanticsService.announce(
-              "${(newProgress * 100).round()}%",
-              TextDirection.ltr,
-            );
-            lastAnnouncedValue = newProgress;
-          },
-        );
-      }
-      controller.onUpdatedSliderProgress(
-        duration.timeStamp,
-      );
+      controller.onUpdatedSliderProgress(duration.timeStamp);
     }
 
     void onSeek(Duration duration, int max) {
@@ -76,14 +52,40 @@ class BottomControl extends StatelessWidget {
       controller
         ..onChangedSliderEnd()
         ..onChangedSlider(duration.inSeconds.toDouble())
-        ..seekTo(
-          Duration(seconds: duration.inSeconds),
-          isSeek: false,
+        ..seekTo(Duration(seconds: duration.inSeconds), isSeek: false);
+    }
+
+    Widget progressBar() {
+      final child = Obx(() {
+        final int value = controller.sliderPositionSeconds.value;
+        final int max = controller.durationSeconds.value.inSeconds;
+        if (value > max || max <= 0) {
+          return const SizedBox.shrink();
+        }
+        return ProgressBar(
+          progress: Duration(seconds: value),
+          buffered: Duration(seconds: controller.bufferedSeconds.value),
+          total: Duration(seconds: max),
+          progressBarColor: primary,
+          baseBarColor: const Color(0x33FFFFFF),
+          bufferedBarColor: bufferedBarColor,
+          thumbColor: primary,
+          thumbGlowColor: thumbGlowColor,
+          barHeight: 3.5,
+          thumbRadius: 7,
+          thumbGlowRadius: 25,
+          onDragStart: onDragStart,
+          onDragUpdate: (e) => onDragUpdate(e, max),
+          onSeek: (e) => onSeek(e, max),
         );
-      SemanticsService.announce(
-        "${(duration.inSeconds / max * 100).round()}%",
-        TextDirection.ltr,
-      );
+      });
+      if (Utils.isDesktop) {
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: child,
+        );
+      }
+      return child;
     }
 
     return Padding(
@@ -98,38 +100,8 @@ class BottomControl extends StatelessWidget {
                 clipBehavior: Clip.none,
                 alignment: Alignment.bottomCenter,
                 children: [
-                  Obx(() {
-                    final int value = controller.sliderPositionSeconds.value;
-                    final int max = controller.durationSeconds.value.inSeconds;
-                    final int buffer = controller.bufferedSeconds.value;
-                    if (value > max || max <= 0) {
-                      return const SizedBox.shrink();
-                    }
-                    final child = ProgressBar(
-                      progress: Duration(seconds: value),
-                      buffered: Duration(seconds: buffer),
-                      total: Duration(seconds: max),
-                      progressBarColor: primary,
-                      baseBarColor: const Color(0x33FFFFFF),
-                      bufferedBarColor: bufferedBarColor,
-                      thumbColor: primary,
-                      thumbGlowColor: thumbGlowColor,
-                      barHeight: 3.5,
-                      thumbRadius: 7,
-                      thumbGlowRadius: 25,
-                      onDragStart: onDragStart,
-                      onDragUpdate: (e) => onDragUpdate(e, max),
-                      onSeek: (e) => onSeek(e, max),
-                    );
-                    if (Utils.isDesktop) {
-                      return MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: child,
-                      );
-                    }
-                    return child;
-                  }),
-                  if (controller.enableSponsorBlock &&
+                  progressBar(),
+                  if (controller.enableBlock &&
                       videoDetailController.segmentProgressList.isNotEmpty)
                     Positioned(
                       left: 0,

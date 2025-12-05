@@ -1,4 +1,6 @@
 import 'package:PiliPlus/common/constants.dart';
+import 'package:PiliPlus/grpc/bilibili/app/listener/v1.pb.dart' show DetailItem;
+import 'package:PiliPlus/models_new/download/bili_download_entry_info.dart';
 import 'package:PiliPlus/models_new/live/live_room_info_h5/data.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/episode.dart';
 import 'package:PiliPlus/models_new/video/video_detail/data.dart';
@@ -29,15 +31,19 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
   static final List<MediaItem> _item = [];
   bool enableBackgroundPlay = Pref.enableBackgroundPlay;
 
+  Function? onPlay;
+  Function? onPause;
+  Function(Duration position)? onSeek;
+
   @override
   Future<void> play() async {
-    PlPlayerController.playIfExists();
+    onPlay?.call() ?? PlPlayerController.playIfExists();
     // player.play();
   }
 
   @override
   Future<void> pause() async {
-    await PlPlayerController.pauseIfExists();
+    await (onPause?.call() ?? PlPlayerController.pauseIfExists());
     // player.pause();
   }
 
@@ -48,7 +54,8 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
         updatePosition: position,
       ),
     );
-    await PlPlayerController.seekToIfExists(position, isSeek: false);
+    await (onSeek?.call(position) ??
+        PlPlayerController.seekToIfExists(position, isSeek: false));
     // await player.seekTo(position);
   }
 
@@ -139,7 +146,7 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
         );
         mediaItem = MediaItem(
           id: id,
-          title: current?.pagePart ?? '',
+          title: current?.part ?? '',
           artist: data.owner?.name,
           duration: Duration(seconds: current?.duration ?? 0),
           artUri: Uri.parse(data.pic ?? ''),
@@ -174,10 +181,26 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
     } else if (data is Part) {
       mediaItem = MediaItem(
         id: id,
-        title: data.pagePart ?? '',
+        title: data.part ?? '',
         artist: artist,
         duration: Duration(seconds: data.duration ?? 0),
         artUri: Uri.parse(cover ?? ''),
+      );
+    } else if (data is DetailItem) {
+      mediaItem = MediaItem(
+        id: id,
+        title: data.arc.title,
+        artist: data.owner.name,
+        duration: Duration(seconds: data.arc.duration.toInt()),
+        artUri: Uri.parse(data.arc.cover),
+      );
+    } else if (data is BiliDownloadEntryInfo) {
+      mediaItem = MediaItem(
+        id: id,
+        title: data.showTitle,
+        artist: data.ownerName,
+        duration: Duration(milliseconds: data.totalTimeMilli),
+        artUri: Uri.parse(data.cover),
       );
     }
     if (mediaItem == null) return;
