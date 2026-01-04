@@ -52,8 +52,8 @@ class _StarUserPageState extends State<StarUserPage> {
     for (int eachMid in starredMids) {
       try {
         final result = await MemberHttp.memberInfo(mid: eachMid);
-        if (result['status'] == true) {
-          final MemberInfoModel userInfo = result['data'];
+        if (result.isSuccess) {
+          final MemberInfoModel userInfo = result.data;
           resolvedItems.add(FansItemModel(
             mid: userInfo.mid ?? eachMid,
             uname: userInfo.name ?? 'User $eachMid',
@@ -65,7 +65,7 @@ class _StarUserPageState extends State<StarUserPage> {
             mid: eachMid,
             uname: 'User $eachMid',
             face: 'https://static.hdslb.com/images/member/noface.gif',
-            sign: '用户信息获取失败: ${result['msg'] ?? '未知错误'}',
+            sign: '用户信息获取失败: ${result.toString().isEmpty ? '未知错误' : result}',
           ));
         }
       } catch (e) {
