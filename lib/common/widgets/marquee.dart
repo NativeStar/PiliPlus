@@ -226,13 +226,14 @@ abstract class MarqueeRender extends RenderBox
     if (_distance > 0) {
       updateSize();
       _ticker.initIfNeeded(_onTick);
+      markNeedsCompositingBitsUpdate();
     } else {
       _ticker.cancel();
     }
   }
 
   @override
-  bool get isRepaintBoundary => true;
+  bool get isRepaintBoundary => _ticker._ticker != null;
 
   void paintCenter(PaintingContext context, Offset offset) {
     if (_direction == Axis.horizontal) {
@@ -470,8 +471,8 @@ class ContextSingleTicker implements TickerProvider {
   ValueListenable<TickerModeData>? _tickerModeNotifier;
 
   void updateTicker() {
-    final TickerModeData values = _tickerModeNotifier!.value;
-    if (_ticker != null) {
+    if (_tickerModeNotifier != null && _ticker != null) {
+      final TickerModeData values = _tickerModeNotifier!.value;
       _ticker!.muted = !values.enabled;
       _ticker!.forceFrames = values.forceFrames;
     }
