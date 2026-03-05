@@ -51,6 +51,17 @@ jobs:
         shell: pwsh
         run: lib/scripts/build.ps1
 
+      - name: pick tooltip fix
+        working-directory: ${{ env.FLUTTER_ROOT }}
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "example@example.com"
+          git stash || true
+          git cherry-pick 56956c33ef102ac0b5fc46b62bd2dd9f50a86616 --no-edit
+          git reset --soft HEAD~1
+          git stash pop || true
+        continue-on-error: true
+
       - name: apply modal barrier patch
         working-directory: ${{ env.FLUTTER_ROOT }}
         run: git apply $GITHUB_WORKSPACE/lib/scripts/modal_barrier_patch.diff || true
@@ -246,25 +257,29 @@ jobs:
             PiliPlus_linux_*.AppImage
 
       - name: Upload linux targz package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
+          archive: false
           name: Linux_targz_amd64_packege
           path: PiliPlus_linux_*.tar.gz
 
       - name: Upload linux deb package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
+          archive: false
           name: Linux_deb_amd64_package
           path: PiliPlus_linux_*.deb
 
       - name: Upload linux rpm package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
+          archive: false
           name: Linux_rpm_amd64_package
           path: PiliPlus_linux_*.rpm
 
       - name: Upload linux AppImage package
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
+          archive: false
           name: Linux_AppImage_amd64_package
           path: PiliPlus_linux_*.AppImage
