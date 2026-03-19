@@ -38,7 +38,7 @@ abstract final class PiliScheme {
 
     listener?.cancel();
     listener = appLinks.uriLinkStream.listen(routePush);
-
+    //上游已修复 作废
     // 处理冷启动时携带的初始链接
     // appLinks.getInitialLink().then((uri) {
     //   if (uri != null) {
