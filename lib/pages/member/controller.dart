@@ -45,6 +45,8 @@ class MemberController extends CommonDataController<SpaceData, SpaceData?>
 
   bool? hasSeasonOrSeries;
 
+  late bool hasCharge = false;
+
   final fromViewAid = Get.parameters['from_view_aid'];
 
   final key = GlobalKey<ExtendedNestedScrollViewState>();
@@ -60,6 +62,7 @@ class MemberController extends CommonDataController<SpaceData, SpaceData?>
     final data = response.response;
     username = data.card?.name ?? '';
     isFollowed = data.card?.relation?.isFollowed;
+    hasCharge = (data.elec?.total ?? 0) > 0;
     if (data.relation == -1) {
       relation.value = 128;
     } else {
