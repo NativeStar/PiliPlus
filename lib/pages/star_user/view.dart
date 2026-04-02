@@ -201,7 +201,7 @@ class _StarUserPageState extends State<StarUserPage> {
                 ? null
                 : () => showConfirmDialog(
                       context: context,
-                      title: '确定移除 ${item.uname} ？',
+                      title: Text('确定移除 ${item.uname} ？'),
                       onConfirm: () => _removeUserFromStars(index, item.mid!),
                     ),
             leading: NetworkImgLayer(
