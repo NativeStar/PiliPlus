@@ -11,6 +11,7 @@ import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/disabled_icon.dart';
 import 'package:PiliPlus/common/widgets/gesture/immediate_tap_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/gesture/mouse_interactive_viewer.dart';
+import 'package:PiliPlus/common/widgets/gesture/player_gesture_recognizer.dart';
 import 'package:PiliPlus/common/widgets/loading_widget.dart';
 import 'package:PiliPlus/common/widgets/pair.dart';
 import 'package:PiliPlus/common/widgets/player_bar.dart';
@@ -152,6 +153,54 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   bool _pauseDueToPauseUponEnteringBackgroundMode = false;
 
   StreamSubscription? _brightnessListener;
+  void _onBrightnessChanged(double value) {
+    if (mounted && _gestureType != .left) {
+      _brightnessValue.value = value;
+    }
+  }
+
+  void _getSystemBrightness() {
+    ScreenBrightnessPlatform.instance.system.then((res) {
+      if (mounted) {
+        _brightnessValue.value = res;
+      }
+    });
+  }
+
+  void _getAppBrightness() {
+    ScreenBrightnessPlatform.instance.application.then((res) {
+      if (mounted) {
+        _brightnessValue.value = res;
+      }
+    });
+  }
+
+  void _onVolumeChanged(double value) {
+    if (mounted && !plPlayerController.volumeInterceptEventStream) {
+      plPlayerController.volume.value = value;
+      if (Platform.isIOS && !FlutterVolumeController.showSystemUI) {
+        plPlayerController
+          ..volumeIndicator.value = true
+          ..volumeTimer?.cancel()
+          ..volumeTimer = Timer(
+            const Duration(milliseconds: 800),
+            () {
+              if (mounted) {
+                plPlayerController.volumeIndicator.value = false;
+              }
+            },
+          );
+      }
+    }
+  }
+
+  void _getCurrVolume() {
+    FlutterVolumeController.getVolume().then((res) {
+      if (mounted) {
+        plPlayerController.volume.value = res!;
+      }
+    });
+  }
 
   int? tmpSubtitlePaddingB;
   StreamSubscription? _controlsListener;
@@ -219,51 +268,29 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     videoController = plPlayerController.videoController!;
 
     if (PlatformUtils.isMobile) {
-      Future.microtask(() async {
+      Future.microtask(() {
         try {
           FlutterVolumeController.updateShowSystemUI(true);
-          plPlayerController.volume.value =
-              (await FlutterVolumeController.getVolume())!;
-          FlutterVolumeController.addListener((double value) {
-            if (mounted && !plPlayerController.volumeInterceptEventStream) {
-              plPlayerController.volume.value = value;
-              if (Platform.isIOS && !FlutterVolumeController.showSystemUI) {
-                plPlayerController
-                  ..volumeIndicator.value = true
-                  ..volumeTimer?.cancel()
-                  ..volumeTimer = Timer(const Duration(milliseconds: 800), () {
-                    if (mounted) {
-                      plPlayerController.volumeIndicator.value = false;
-                    }
-                  });
-              }
-            }
-          }, emitOnStart: false);
+          _getCurrVolume();
+          FlutterVolumeController.addListener(
+            _onVolumeChanged,
+            emitOnStart: false,
+          );
         } catch (_) {}
-      });
 
-      Future.microtask(() async {
         try {
-          void listener(double value) {
-            if (mounted) {
-              _brightnessValue.value = value;
-            }
-          }
-
           if (Platform.isIOS || plPlayerController.setSystemBrightness) {
-            _brightnessValue.value =
-                await ScreenBrightnessPlatform.instance.system;
+            _getSystemBrightness();
             _brightnessListener = ScreenBrightnessPlatform
                 .instance
                 .onSystemScreenBrightnessChanged
-                .listen(listener);
+                .listen(_onBrightnessChanged);
           } else {
-            _brightnessValue.value =
-                await ScreenBrightnessPlatform.instance.application;
+            _getAppBrightness();
             _brightnessListener = ScreenBrightnessPlatform
                 .instance
                 .onApplicationScreenBrightnessChanged
-                .listen(listener);
+                .listen(_onBrightnessChanged);
           }
         } catch (_) {}
       });
@@ -289,7 +316,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     _doubleTapGestureRecognizer = DoubleTapGestureRecognizer()
       ..onDoubleTapDown = _onDoubleTapDown;
 
-    _scaleGestureRecognizer = ScaleGestureRecognizer(
+    _scaleGestureRecognizer = PlayerScaleGestureRecognizer(
       debugOwner: this,
       dragStartBehavior: .start,
       allowedButtonsFilter: (buttons) => buttons == kPrimaryButton,
@@ -320,6 +347,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   Future<void> setBrightness(double value) async {
+    _brightnessValue.value = value;
     try {
       if (Platform.isIOS || plPlayerController.setSystemBrightness) {
         await ScreenBrightnessPlatform.instance.setSystemScreenBrightness(
@@ -1104,11 +1132,6 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   }
 
   void _onPanEnd(ScaleEndDetails details) {
-    if (Platform.isAndroid &&
-        _gestureType == .left &&
-        plPlayerController.setSystemBrightness) {
-      ScreenBrightnessPlatform.instance.restoreBrightnessMode();
-    }
     if (plPlayerController.showSeekPreview) {
       plPlayerController.showPreview.value = false;
     }
@@ -1207,11 +1230,11 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             plPlayerController.setLongPressStatus(false));
   late final ImmediateTapGestureRecognizer _tapGestureRecognizer;
   late final DoubleTapGestureRecognizer _doubleTapGestureRecognizer;
-  late final ScaleGestureRecognizer _scaleGestureRecognizer;
+  late final PlayerScaleGestureRecognizer _scaleGestureRecognizer;
 
   StreamSubscription<bool>? _danmakuListener;
 
-  static const _kOffsetThreshold = 30.0;
+  static const _kOffsetThreshold = 25.0;
   bool _isPositionAllowed(Offset offset) {
     if (offset.dx < _kOffsetThreshold ||
         offset.dy < _kOffsetThreshold ||
@@ -1245,16 +1268,13 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     if (PlatformUtils.isMobile) {
       _tapGestureRecognizer.addPointer(event);
       if (controlsUnlock) {
-        final flag = _isPositionAllowed(event.localPosition);
         if (!plPlayerController.isLive) {
           _doubleTapGestureRecognizer.addPointer(event);
-          if (flag) {
-            longPressRecognizer.addPointer(event);
-          }
+          longPressRecognizer.addPointer(event);
         }
-        if (flag) {
-          _scaleGestureRecognizer.addPointer(event);
-        }
+        _scaleGestureRecognizer
+          ..isPosAllowed = _isPositionAllowed(event.localPosition)
+          ..addPointer(event);
       }
     } else if (controlsUnlock) {
       if (plPlayerController.isLive) {
@@ -1788,10 +1808,16 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                           child: ViewPointSegmentProgressBar(
                             segments: videoDetailController.viewPointList,
                             onSeek: PlatformUtils.isMobile
-                                ? (position) => plPlayerController.seekTo(
-                                    position,
-                                    isSeek: false,
-                                  )
+                                ? (position) {
+                                    if (!plPlayerController
+                                        .controlsLock
+                                        .value) {
+                                      plPlayerController.seekTo(
+                                        position,
+                                        isSeek: false,
+                                      );
+                                    }
+                                  }
                                 : null,
                           ),
                         ),
