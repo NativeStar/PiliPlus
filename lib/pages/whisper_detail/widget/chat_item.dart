@@ -21,7 +21,7 @@ import 'package:PiliPlus/utils/extension/num_ext.dart';
 import 'package:PiliPlus/utils/id_utils.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
 import 'package:PiliPlus/utils/page_utils.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:get/get.dart';
@@ -177,7 +177,7 @@ class ChatItem extends StatelessWidget {
           return msgTypeTipMessage_18(theme, content);
         case MsgType.EN_MSG_TYPE_TEXT:
           return msgTypeText_1(theme, content: content, textColor: textColor);
-        case MsgType.EN_MSG_TYPE_PIC:
+        case MsgType.EN_MSG_TYPE_PIC || MsgType.EN_MSG_TYPE_CUSTOM_FACE:
           return msgTypePic_2(content);
         case MsgType.EN_MSG_TYPE_SHARE_V2:
           return msgTypeShareV2_7(content, textColor);
